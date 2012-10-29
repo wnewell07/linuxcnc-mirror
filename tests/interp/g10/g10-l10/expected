@@ -1,0 +1,63 @@
+    1 N..... USE_LENGTH_UNITS(CANON_UNITS_MM)
+    2 N..... SET_G5X_OFFSET(1, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000)
+    3 N..... SET_G92_OFFSET(0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000)
+    4 N..... SET_XY_ROTATION(0.0000)
+    5 N..... SET_FEED_REFERENCE(CANON_XYZ)
+    6 N..... USE_LENGTH_UNITS(CANON_UNITS_INCHES)
+ current location: x=0.000000, y=0.000000, z=0.000000
+ current tool: toolno=0.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=0.000000
+    7 N..... SELECT_POCKET(1)
+    8 N..... STOP_SPINDLE_TURNING()
+    9 N..... COMMENT("AXIS,hide")
+   10 N..... STRAIGHT_TRAVERSE(0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000)
+   11 N..... COMMENT("AXIS,show")
+   12 N..... CHANGE_TOOL(1)
+ current location: x=0.000000, y=0.000000, z=0.000000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=1.000000
+   13 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 1.0000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=-1.000000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=1.000000
+   14 N..... SET_TOOL_TABLE_ENTRY(1, 1, 0.0000 0.0000 -0.1000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+   15 N..... SET_TOOL_TABLE_ENTRY(0, 1, 0.0000 0.0000 -0.1000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+ current location: x=0.000000, y=0.000000, z=-1.000000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.100000
+   16 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 -0.1000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=0.100000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.100000
+   17 N..... SET_TOOL_TABLE_ENTRY(2, 99999, 0.0000 0.0000 -0.2000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+ current location: x=0.000000, y=0.000000, z=0.100000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.100000
+   18 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 -0.1000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=0.100000
+ current tool: toolno=1.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.100000
+   19 N..... SELECT_POCKET(2)
+   20 N..... STOP_SPINDLE_TURNING()
+   21 N..... COMMENT("AXIS,hide")
+   22 N..... STRAIGHT_TRAVERSE(0.0000, 0.0000, 0.1000, 0.0000, 0.0000, 0.0000)
+   23 N..... COMMENT("AXIS,show")
+   24 N..... CHANGE_TOOL(2)
+ current location: x=0.000000, y=0.000000, z=0.100000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.200000
+   25 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 -0.2000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=0.200000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.200000
+   26 N..... SET_TOOL_TABLE_ENTRY(1, 1, 0.0000 0.0000 -0.3000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+ current location: x=0.000000, y=0.000000, z=0.200000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.200000
+   27 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 -0.2000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=0.200000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.200000
+   28 N..... SET_TOOL_TABLE_ENTRY(2, 99999, 0.0000 0.0000 -0.4000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+   29 N..... SET_TOOL_TABLE_ENTRY(0, 99999, 0.0000 0.0000 -0.4000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000, 0.0000, 0.0000, 0)
+ current location: x=0.000000, y=0.000000, z=0.200000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.400000
+   30 N..... USE_TOOL_LENGTH_OFFSET(0.0000 0.0000 -0.4000, 0.0000 0.0000 0.0000, 0.0000 0.0000 0.0000)
+ current location: x=0.000000, y=0.000000, z=0.400000
+ current tool: toolno=99999.000000, tlo_x=0.000000, tlo_y=0.000000, tlo_z=-0.400000
+   31 N..... SET_G5X_OFFSET(1, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000)
+   32 N..... SET_XY_ROTATION(0.0000)
+   33 N..... SET_FEED_MODE(0)
+   34 N..... SET_FEED_RATE(0.0000)
+   35 N..... STOP_SPINDLE_TURNING()
+   36 N..... SET_SPINDLE_MODE(0.0000)
+   37 N..... PROGRAM_END()

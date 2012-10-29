@@ -1,0 +1,79 @@
+
+o10 sub
+    (print, current location: x=#5420, y=#5421, z=#5422)
+    (print, current tool: toolno=#5400, tlo_x=#5401, tlo_y=#5402, tlo_z=#5403)
+o10 endsub
+
+
+; i think in inches, but that shouldnt matter for this test
+g20
+o10 call
+
+
+; put tool 1 in the spindle
+t1 m6
+o10 call
+
+; make current tool's tlo active
+; this should update pocket 0 (spindle)
+g43
+o10 call
+
+
+; set z tlo of tool 1
+; this should update tlo of both pocket 1 (t1's pocket) and pocket 0 (spindle)
+g10 l10 p1 z0.1
+o10 call
+
+; make current tool's tlo active
+; this should update pocket 0 (spindle)
+; this G43 is redundant, the G10 L10 above already adjusted the pocket 0 tlo
+g43
+o10 call
+
+
+; set z tlo of tool 99999
+; this should update tlo of pocket 2 (t99999's pocket) only
+g10 l10 p99999 z0.2
+o10 call
+
+; make current tool's tlo active
+g43
+o10 call
+
+
+; put tool 99999 in the spindle
+t99999 m6
+o10 call
+
+; make current tools tlo active
+; this should update pocket 0 (spindle)
+g43
+o10 call
+
+
+; set z tlo of tool 1
+; this should update tlo of pocket 1 (t1's pocket) only
+g10 l10 p1 z0.3
+o10 call
+
+; make current tool's tlo active
+; this should update pocket 0 (spindle)
+g43
+o10 call
+
+
+; set z tlo of tool 99999
+; this should update tlo of pocket 2 (t99999's pocket) and pocket 0 (spindle)
+g10 l10 p99999 z0.4
+o10 call
+
+; make current tool's tlo active
+; this should update pocket 0 (spindle)
+; this G43 is redundant, the G10 L10 should have updated it already
+g43
+o10 call
+
+
+m2
+
