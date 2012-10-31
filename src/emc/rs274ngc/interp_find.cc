@@ -712,9 +712,12 @@ int Interp::find_tool_pocket(setup_pointer settings, int toolno, int *pocket)
         return INTERP_OK;
     }
     *pocket = -1;
-    for(int i=0; i<CANON_POCKETS_MAX; i++) {
-        if(settings->tool_table[i].toolno == toolno)
+    // start at pocket 1, skipping pocket 0 (the spindle)
+    for(int i=1; i<CANON_POCKETS_MAX; i++) {
+        if(settings->tool_table[i].toolno == toolno) {
             *pocket = i;
+            break;
+        }
     }
 
     CHKS((*pocket == -1), (_("Requested tool %d not found in the tool table")), toolno);
