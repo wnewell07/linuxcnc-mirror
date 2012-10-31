@@ -2698,11 +2698,23 @@ int GET_EXTERNAL_QUEUE_EMPTY(void)
     return emcStatus->motion.traj.queue == 0 ? 1 : 0;
 }
 
+// returns the slot/pocket number of the tool currently in the spindle,
+// or 0 if there is no tool in the spindle
 int GET_EXTERNAL_TOOL_SLOT()
 {
-    return emcStatus->io.tool.toolInSpindle;
+    int toolno = emcStatus->io.tool.toolInSpindle;
+    int pocket;
+
+    for (pocket = 1; pocket < CANON_POCKETS_MAX; pocket++) {
+        if (emcStatus->io.tool.toolTable[pocket].toolno == toolno) {
+            return pocket;
+        }
+    }
+
+    return 0;  // no tool in spindle
 }
 
+// return the pocket of the currently selected tool (most recent T-code)
 int GET_EXTERNAL_SELECTED_TOOL_SLOT()
 {
     return emcStatus->io.tool.pocketPrepped;
