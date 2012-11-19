@@ -705,6 +705,20 @@ double Interp::find_turn(double x1,      //!< X-coordinate of start point
   return (theta);
 }
 
+
+//
+// Find the pocket of the specified tool number 'toolno'.
+//
+// Which pocket is returned depends on where the specified tool is found.
+//
+// If the tool is in the tool changer, return the tool's current pocket in
+// the tool changer.
+//
+// Otherwise, if the tool is in the spindle, return 0 (pocket 0 means "in
+// the spindle").
+//
+// Otherwise (if the tool number is not found anywhere), return -1.
+//
 int Interp::find_tool_pocket(setup_pointer settings, int toolno, int *pocket)
 {
     if(!settings->random_toolchanger && toolno == 0) {
