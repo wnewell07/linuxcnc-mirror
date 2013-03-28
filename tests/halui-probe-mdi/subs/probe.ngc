@@ -1,0 +1,14 @@
+
+o<probe> sub
+    (msg, starting probe sub)
+
+    (msg, g0 to starting place)
+    g0 x0 y0.1
+
+    (msg, slow feed of f1)
+    f1
+
+    (msg, finally, the probe)
+    g38.2 x1
+o<probe> endsub
+
