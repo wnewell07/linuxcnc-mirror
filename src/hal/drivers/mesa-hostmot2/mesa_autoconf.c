@@ -735,7 +735,7 @@ void hm2_sserial_auto_print_conf(hostmot2_t *hm2, hm2_sserial_data_t *conf){
             (int)((conf->ParmMax - (int)conf->ParmMax) * 100.0));
     HM2_DBG("ParmMin %0i.%02i\n",(int)conf->ParmMin,
             (int)((conf->ParmMin - (int)conf->ParmMin) * 100.0));
-    HM2_DBG("SizeOf ParmMin %i\n", sizeof(conf->ParmMax));
+    HM2_DBG("SizeOf ParmMin %zi\n", sizeof(conf->ParmMax));
     HM2_DBG("ParmAddr = %x\n", conf->ParmAddr); 
     HM2_DBG("UnitString = %s.\n", conf->UnitString);
     HM2_DBG("NameString = %s.\n\n", conf->NameString);
