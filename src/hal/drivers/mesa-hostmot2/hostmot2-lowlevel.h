@@ -20,9 +20,6 @@
 #ifndef HOSTMOT2_LOWLEVEL_H
 #define HOSTMOT2_LOWLEVEL_H
 
-#include <linux/device.h>
-#include <linux/firmware.h>
-
 #include "rtapi.h"
 #include "hal.h"
 

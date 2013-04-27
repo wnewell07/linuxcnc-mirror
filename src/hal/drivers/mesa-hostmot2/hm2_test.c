@@ -25,9 +25,6 @@
 //  verify that the hostmot2 driver functions as it ought.
 //
 
-
-#include <linux/pci.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
