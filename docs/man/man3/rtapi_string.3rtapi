@@ -1,0 +1,54 @@
+.TH rtapi_string "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+<rtapi_string.h> \- Portable access to string functions
+
+.SH HEADER
+.HP
+#include <rtapi_string.h>
+
+.SH FUNCTIONS
+.HP
+extern char *rtapi_strdup(const char *s, rtapi_gfp_t);
+.HP
+extern char *rtapi_strndup(const char *s, size_t n, rtapi_gfp_t);
+
+Duplicate a string (optionally with a maximum length) with rtapi_alloc as the
+underlying allocator.  The caller must use rtapi_free to ultimately free the
+returned value if it is not null.  Other than the allocator, these functions
+behave as described in strdup.3 and strndup.3.
+
+.HP
+char **rtapi_argv_split(gfp_t gfp, const char *str, int *argcp);
+
+Split an argument string on whitespace.  In the case of success, returns a pointer to an
+array of argument strings and sets *argcp to the number of arguments.  The caller must free
+the allocated menory with rtapi_argv_free.  In the case of failure, NULL is retured and
+the value of argcp is undefined.  The gfp argument is as described in rtapi_slab.h; GPF_KERNEL
+is a typical value.
+
+.HP
+void rtapi_argv_free(char **argv);
+
+Free an earlier pointer returned by rtapi_argv_split.
+
+.SH DESCRIPTION
+In userspace, this includes <string.h> and in kernel space this includes
+<linux/string.h>, allowing use of the common subset of functions (or
+function-like macros) defined in these headers while being agnostic about
+whether building for userspace or kernel space.
+
+In addition, it defines some functions with rtapi prefixes, mentioned above.
+
+.SH REALTIME CONSIDERATIONS
+Functions that do not perform memory allocation may be run from any code (e.g.,
+strlen) though realtime considerations may place limitations on the lengths of
+strings that can be manipulated (e.g., strlen's runtime is proportional to the
+string length, so without an upper bound on string length there is no upper
+bound on execution time)
+
+Functions that do perform memory allocation (e.g., rtapi_strdup) may be used from setup/cleanup code but not from realtime code.
+
+.SH RETURN VALUE
+An RTAPI status code.
+.SH SEE ALSO

@@ -1,0 +1,72 @@
+.TH rtapi_slab.h "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+rtapi_slab.h \- Portable functions for memory management
+
+.SH HEADER
+.HP
+#include <rtapi_slab.h>
+
+.SH FUNCTIONS
+.HP
+void *rtapi_alloc(size_t size, rtapi_gpf_t mode);
+
+Allocate \fBsize\fR bytes of memory.  In kernelspace, \fBmode\fR is
+passed to the underlying kernel allocator, kmalloc.  In userspace,
+\fBmode\fR is ignored.  NULL is returned to indicate failure.  In the
+non-failure case, the pointer must eventually be freed by a
+corresponding call to \fRrtapi_free\fR.  (Unlike traditional userspace C
+programs which free all memory when they exit, this memory is not
+automatically freed when the realtime session is shut down)
+
+.HP
+void *rtapi_zalloc(size_t size, rtapi_gpf_t mode);
+
+As \fBrtapi_alloc\fR except that the memory is guaranteed to be
+zero-filled (as calloc or kzalloc)
+
+.HP
+void *rtapi_realloc(void *oldptr, size_t newsize, rtapi_gpf_t mode);
+
+Change the size of the block allocated by an earlier call to
+rtapi_alloc, rtapi_zalloc, or rtapi_realloc.  rtapi_realloc(NULL, size,
+mode) is the same as rtapi_alloc(size, mode).  In other cases, the same
+mode value should be passed as in the initial allocation.
+
+In case of failure, the original argument pointer remains valid and the
+caller must still \fBrtapi_free\fR it.
+
+In the case of success, the original pointer is freed and the caller now
+has the respoinsibility to eventually free the returned pointer.
+
+Note that even if the block was originally allocated with
+\fBrtapi_zalloc\fR the initial contents of any additional storage are
+undefined, not zeroed.
+
+.HP
+void *rtapi_free(void *ptr);
+
+Free a pointer returned by an earlier call to rtapi_alloc, rtapi_zalloc,
+or rtapi_realloc.
+
+.SH TYPES
+.HP
+enum rtapi_gfp_e
+This enumerated type contains RTAPI_GFP_KERNEL, RTAPI_GFP_USER, and
+RTAPI_GFP_DMA.
+.HP
+unspecified-integral-type rtapi_gpf_t
+This is the argument type used where an rtapi_gpf_e value should be
+passed.
+
+.SH DESCRPTION
+
+These functions allow memory allocation which is agnostic about whether
+the target is kernelspace or userspace.  In rtapi code, prefer these
+functions to the standard C APIs like malloc/free and to the standard
+Linux Kernel APIS like kalloc/kfree, because such code is not portable
+between userspace and kernel space.
+
+.SH REALTIME CONSIDERATIONS
+May be called from setup/shutdown code.  Not suitable for calling from
+realtime functions.

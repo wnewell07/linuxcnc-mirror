@@ -1,0 +1,60 @@
+.TH rtapi_pci "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+<rtapi_pci.h> \- Portable access to I/O devices
+
+.SH HEADER
+.HP
+#include <rtapi_pci.h>
+
+.SH FUNCTIONS
+
+.HP 
+rtapi_pci_get_device
+.HP 
+rtapi_pci_put_device
+.HP 
+rtapi_pci_ioremap
+.HP 
+rtapi_pci_iounmap
+.HP 
+rtapi_pci_resource_len
+.HP
+rtapi_pci_set_drvdata
+.HP
+rtapi_pci_set_disable_device
+.HP
+rtapi_pci_resource_start
+.HP
+rtapi_pci_ioremap_bar
+
+These functions behave substantially in the same way as the Linux Kernel
+APIs.  Refer to Linux kernel documentation for more information.  For
+example, for documentation of rtapi_pci_get_device, refer to the Linux
+Kernel documentation for pci_get_device.
+
+.SH TYPES
+.HP
+struct rtapi_pci_device_id;
+
+This structure contains at least the following fields:
+vendor, device, subvendor, subdevice, class, class_mask
+
+.HP
+struct rtapi_pci_dev;
+
+This is an opaque structure.
+
+
+.SH DESCRIPTION
+
+These functions and structures are modeled after the Linux kernel APIs,
+but the rtapi_ prefixed versions will also have an implementation for 
+RTOSes that use the userspace threads model.
+
+.SH REALTIME CONSIDERATIONS
+May be called from setup/shutdown code.  Not suitable for calling from
+realtime functions.
+
+.SH SEE ALSO
+Linux Kernel documentation.

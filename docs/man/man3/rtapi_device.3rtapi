@@ -1,0 +1,35 @@
+.TH rtapi_device "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+<rtapi_device.h> \- Portable device registration/deregistration APIs
+
+.SH HEADER
+.HP
+#include <rtapi_device.h>
+
+.SH FUNCTIONS
+.HP
+int rtapi_device_set_name(struct rtapi_device *dev, const char *name);
+.HP
+int rtapi_device_register(struct rtapi_device *dev);
+.HP
+int rtapi_device_unregister(struct rtapi_device *dev);
+
+.SH TYPES
+.HP
+struct rtapi_device
+
+A structure which has at least the fields 'bus_id' and 'release'.
+
+.SH DESCRIPTION
+Provide portable wrappers on the underlying Linux kernel APIs.  In kernel
+space, these wrappers call the underlying kernel APIs (e.g.,
+rtapi_device_register calls device_register). In userspace, these wrappers
+don't do much but are intended to allow some hardware drivers to be built in
+userspace without conditional compilation.
+
+.SH RETURN VALUE
+As the underlying Linux kernel APIs
+
+.SH REALTIME CONSIDERATIONS
+May be called from setup/shutdown code.  May not be called from realtime code.

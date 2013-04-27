@@ -1,0 +1,26 @@
+.TH rtapi_ctype "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+<rtapi_ctype.h> \- Portable access to ctype functions
+
+.SH HEADER
+.HP
+#include <rtapi_ctype.h>
+
+.SH DESCRIPTION
+In userspace, this includes <ctype.h> and in kernel space this includes
+<linux/ctype.h>, allowing use of the common subset of functions (or
+function-like macros) defined in these headers while being agnostic about
+whether building for userspace or kernel space.
+
+Note that there are differences in locale handling between userspace or kernel
+space.  Userspace should run with the C locale in order to avoid these
+differences.
+
+.SH REALTIME CONSIDERATIONS
+The Character-class functions (isascii et al) and case conversion functions
+(tolower et al) are safe to call anywhere, including from realtime code.
+
+.SH RETURN VALUE
+An RTAPI status code.
+.SH SEE ALSO

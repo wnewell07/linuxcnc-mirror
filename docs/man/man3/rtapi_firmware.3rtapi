@@ -1,0 +1,38 @@
+.TH rtapi_firmware "3rtapi" "2006-10-12" "LinuxCNC Documentation" "RTAPI"
+.SH NAME
+
+<rtapi_firmware.h> \- Portable firmware loading APIs
+
+.SH HEADER
+.HP
+#include <rtapi_firmware.h>
+
+.SH FUNCTIONS
+.HP
+int rtapi_request_firmware(const struct rtapi_firmware **fw, const char *name, struct rtapi_device *device);
+
+If successful, the firmware must be freed by a later call to rtapi_release_firmware.
+
+.HP
+int rtapi_release_firmware(const struct rtapi_firmware *fw);
+
+Release resources associated with the given firmware, which must be from an earlier call to rtapi_request_firmware.
+
+.SH TYPES
+.HP
+struct rtapi_firmware
+
+This structure contains at least the members 'size' and 'data' .
+
+.SH DESCRIPTION
+Provide portable wrappers on the underlying Linux kernel APIs.  In kernel
+space, these wrappers call the underlying kernel APIs (e.g.,
+rtapi_request_firmware calls firmware_register). In userspace, a compatible
+implementation is defined to allow some hardware drivers to be built in
+userspace without conditional compilation.
+
+.SH RETURN VALUE
+As the underlying Linux kernel APIs
+
+.SH REALTIME CONSIDERATIONS
+May be called from setup/shutdown code.  May not be called from realtime code.
