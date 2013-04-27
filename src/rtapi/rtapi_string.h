@@ -13,6 +13,8 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program; if not, write to the Free Software
 //    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#ifndef RTAPI_STRING_H
+#define RTAPI_STRING_H
 #ifdef MODULE
 /* Suspect only very early kernels are missing the basic string functions.
    To be sure, see what has been implemented by looking in linux/string.h
@@ -37,4 +39,5 @@ static int strcmp(const char *cs, const char *ct)
 #endif /* linux 2.4 */
 #else
 #include <string.h>
+#endif
 #endif
