@@ -38,9 +38,7 @@ MODULE_SUPPORTED_DEVICE("Mesa-AnythingIO-5i20");  // FIXME
 
 
 static char *config[HM2_PCI_MAX_BOARDS];
-static int num_config_strings = HM2_PCI_MAX_BOARDS;
-module_param_array(config, charp, &num_config_strings, S_IRUGO);
-MODULE_PARM_DESC(config, "config string for the AnyIO boards (see hostmot2(9) manpage)");
+RTAPI_MP_ARRAY_STRING(config, HM2_PCI_MAX_BOARDS, "config string for the AnyIO boards (see hostmot2(9) manpage)")
 
 
 static int comp_id;
