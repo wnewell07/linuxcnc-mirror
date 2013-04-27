@@ -15,9 +15,17 @@
 //    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #ifndef RTAPI_STRING_H
 #define RTAPI_STRING_H
-#ifdef MODULE
+#ifdef __KERNEL__
 #include <linux/string.h>
+#define rtapi_strdup kstrdup
+#define rtapi_strndup kstrndup
+#define rtapi_argv_split argv_split
+#define rtapi_argv_free argv_free
 #else
 #include <string.h>
+#define rtapi_strdup(s,g) strdup(s)
+#define rtapi_strndup(s,n,g) strndup(s,n)
+void rtapi_argv_free(char **argv);
+char **rtapi_argv_split(long gfp, const char *str, int *argcp);
 #endif
 #endif
