@@ -26,11 +26,7 @@
 #ifndef __BITFILE_H
 #define __BITFILE_H
 
-
-#include <linux/firmware.h>
-
-
-
+#include <rtapi_firmware.h>
 
 typedef struct {
     int size;
@@ -45,7 +41,7 @@ typedef struct {
 
 
 
-int bitfile_parse_and_verify(const struct firmware *fw, bitfile_t *bitfile);
+int bitfile_parse_and_verify(const struct rtapi_firmware *fw, bitfile_t *bitfile);
 u8 bitfile_reverse_bits(u8 data);
 
 

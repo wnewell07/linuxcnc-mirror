@@ -18,7 +18,7 @@
 //
 
 #include "rtapi_math.h"
-#include <linux/slab.h>
+#include "rtapi_slab.h"
 #include "hal/drivers/mesa-hostmot2/hostmot2.h"
 
 // local functions
@@ -48,7 +48,7 @@ int hm2_auto_create(hostmot2_t *hm2, hm2_module_descriptor_t *md) {
         }
         
         inst->tram_auto =
-        (hm2_sserial_tram_t *)kmalloc(inst->num_auto * sizeof(hm2_sserial_tram_t),
+        (hm2_sserial_tram_t *)rtapi_alloc(inst->num_auto * sizeof(hm2_sserial_tram_t),
                                       GFP_KERNEL);
         if (inst->tram_auto == NULL) {
             HM2_ERR("out of memory!\n");
@@ -263,7 +263,7 @@ int hm2_sserial_auto_read_configs(hostmot2_t *hm2, hm2_sserial_tram_t *tram, hal
         
         if (rectype == 0xA0) {
             chan->num_confs++;
-            chan->conf = (hm2_sserial_data_t *)krealloc(chan->conf, 
+            chan->conf = (hm2_sserial_data_t *)rtapi_realloc(chan->conf, 
                           chan->num_confs * sizeof(hm2_sserial_data_t),
                           GFP_KERNEL);
             addr = hm2_sserial_get_bytes(hm2, tram, &chan->conf[chan->num_confs-1], addr, 14);
@@ -289,7 +289,7 @@ int hm2_sserial_auto_read_configs(hostmot2_t *hm2, hm2_sserial_tram_t *tram, hal
             
         } else if (rectype == 0xB0 ) {
             chan->num_modes++;
-            chan->modes = (hm2_sserial_mode_t *)krealloc(chan->modes, 
+            chan->modes = (hm2_sserial_mode_t *)rtapi_realloc(chan->modes, 
                            chan->num_modes * sizeof(hm2_sserial_mode_t),
                            GFP_KERNEL);
             addr = hm2_sserial_get_bytes(hm2, tram, &chan->modes[chan->num_modes-1], addr, 4);
@@ -756,13 +756,13 @@ void hm2_sserial_auto_cleanup(hostmot2_t *hm2){
         if (hm2->sserial.instance[i].tram_auto){
             for (j = 0 ; j < hm2->sserial.instance[i].num_auto; j++){
                 if (hm2->sserial.instance[i].hal_auto[j].num_confs > 0){
-                    kfree(hm2->sserial.instance[i].hal_auto[j].conf);
+                    rtapi_free(hm2->sserial.instance[i].hal_auto[j].conf);
                 };
                 if (hm2->sserial.instance[i].hal_auto[j].num_modes > 0){
-                    kfree(hm2->sserial.instance[i].hal_auto[j].modes);
+                    rtapi_free(hm2->sserial.instance[i].hal_auto[j].modes);
                 }
             }
-            kfree(hm2->sserial.instance[i].tram_auto);
+            rtapi_free(hm2->sserial.instance[i].tram_auto);
         }
     }
 }

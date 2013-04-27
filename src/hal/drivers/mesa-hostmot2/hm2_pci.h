@@ -129,7 +129,7 @@
 
 
 typedef struct {
-    struct pci_dev *dev;
+    struct rtapi_pci_dev *dev;
     void __iomem *base;
     int len;
     unsigned long ctrl_base_addr;

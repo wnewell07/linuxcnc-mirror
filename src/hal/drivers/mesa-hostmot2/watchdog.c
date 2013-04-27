@@ -17,12 +17,11 @@
 //    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 //
 
-#include <linux/slab.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
+#include "rtapi_slab.h"
 
 #include "hal.h"
 
@@ -170,21 +169,21 @@ int hm2_watchdog_parse_md(hostmot2_t *hm2, int md_index) {
     // allocate memory for register buffers
     //
 
-    hm2->watchdog.status_reg = (u32 *)kmalloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.status_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->watchdog.status_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail0;
     }
 
-    hm2->watchdog.reset_reg = (u32 *)kmalloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.reset_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->watchdog.reset_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
 
-    hm2->watchdog.timer_reg = (u32 *)kmalloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.timer_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->watchdog.timer_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -257,13 +256,13 @@ int hm2_watchdog_parse_md(hostmot2_t *hm2, int md_index) {
 
 
 fail3:
-    kfree(hm2->watchdog.timer_reg);
+    rtapi_free(hm2->watchdog.timer_reg);
 
 fail2:
-    kfree(hm2->watchdog.reset_reg);
+    rtapi_free(hm2->watchdog.reset_reg);
 
 fail1:
-    kfree(hm2->watchdog.status_reg);
+    rtapi_free(hm2->watchdog.status_reg);
 
 fail0:
     hm2->watchdog.num_instances = 0;
@@ -291,9 +290,9 @@ void hm2_watchdog_print_module(hostmot2_t *hm2) {
 
 void hm2_watchdog_cleanup(hostmot2_t *hm2) {
     if (hm2->watchdog.num_instances <= 0) return;
-    if (hm2->watchdog.status_reg != NULL) kfree(hm2->watchdog.status_reg);
-    if (hm2->watchdog.reset_reg != NULL) kfree(hm2->watchdog.reset_reg);
-    if (hm2->watchdog.timer_reg != NULL) kfree(hm2->watchdog.timer_reg);
+    if (hm2->watchdog.status_reg != NULL) rtapi_free(hm2->watchdog.status_reg);
+    if (hm2->watchdog.reset_reg != NULL) rtapi_free(hm2->watchdog.reset_reg);
+    if (hm2->watchdog.timer_reg != NULL) rtapi_free(hm2->watchdog.timer_reg);
 }
 
 

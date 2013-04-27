@@ -26,12 +26,11 @@
 //
 
 
-#include <linux/slab.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
+#include "rtapi_slab.h"
 
 #include "hal.h"
 
@@ -272,7 +271,7 @@ int hm2_encoder_parse_md(hostmot2_t *hm2, int md_index) {
         goto fail0;
     }
 
-    hm2->encoder.control_reg = (u32 *)kmalloc(hm2->encoder.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->encoder.control_reg = (u32 *)rtapi_alloc(hm2->encoder.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->encoder.control_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -487,7 +486,7 @@ int hm2_encoder_parse_md(hostmot2_t *hm2, int md_index) {
 
 
 fail1:
-    kfree(hm2->encoder.control_reg);
+    rtapi_free(hm2->encoder.control_reg);
 
 fail0:
     hm2->encoder.num_instances = 0;
@@ -919,7 +918,7 @@ void hm2_encoder_process_tram_read(hostmot2_t *hm2, long l_period_ns) {
 
 void hm2_encoder_cleanup(hostmot2_t *hm2) {
     if (hm2->encoder.num_instances <= 0) return;
-    kfree(hm2->encoder.control_reg);
+    rtapi_free(hm2->encoder.control_reg);
 }
 
 

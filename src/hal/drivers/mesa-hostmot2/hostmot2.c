@@ -17,13 +17,14 @@
 //    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 //
 
-#include <linux/slab.h>
-#include <linux/ctype.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
+#include "rtapi_device.h"
+#include "rtapi_slab.h"
+#include "rtapi_ctype.h"
+#include "rtapi_firmware.h"
 
 #include "hal.h"
 
@@ -234,7 +235,7 @@ static int hm2_parse_config_string(hostmot2_t *hm2, char *config_string) {
 
     HM2_DBG("parsing config string \"%s\"\n", config_string);
 
-    argv = argv_split(GFP_KERNEL, config_string, &argc);
+    argv = rtapi_argv_split(GFP_KERNEL, config_string, &argc);
     if (argv == NULL) {
         HM2_ERR("out of memory while parsing config string\n");
         return -ENOMEM;
@@ -304,7 +305,7 @@ static int hm2_parse_config_string(hostmot2_t *hm2, char *config_string) {
 
         } else if (strncmp(token, "firmware=", 9) == 0) {
             // FIXME: we leak this in hm2_register
-            hm2->config.firmware = kstrdup(token + 9, GFP_KERNEL);
+            hm2->config.firmware = rtapi_strdup(token + 9, GFP_KERNEL);
             if (hm2->config.firmware == NULL) {
                 goto fail;
             }
@@ -332,7 +333,7 @@ static int hm2_parse_config_string(hostmot2_t *hm2, char *config_string) {
     HM2_DBG("    enable_raw=%d\n",   hm2->config.enable_raw);
     HM2_DBG("    firmware=%s\n",   hm2->config.firmware ? hm2->config.firmware : "(NULL)");
 
-    argv_free(argv);
+    rtapi_argv_free(argv);
     return 0;
 
 fail:
@@ -791,12 +792,12 @@ static int hm2_parse_module_descriptors(hostmot2_t *hm2) {
 
 
 //
-// These functions free all the memory kmalloc'ed in hm2_parse_module_descriptors()
+// These functions free all the memory rtapi_alloc'ed in hm2_parse_module_descriptors()
 //
 
 static void hm2_cleanup(hostmot2_t *hm2) {
     // clean up the Pins, if they're initialized
-    if (hm2->pin != NULL) kfree(hm2->pin);
+    if (hm2->pin != NULL) rtapi_free(hm2->pin);
 
     // clean up the Modules
     hm2_ioport_cleanup(hm2);
@@ -946,7 +947,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
     // make a hostmot2_t struct to represent this device
     //
 
-    hm2 = kmalloc(sizeof(hostmot2_t), GFP_KERNEL);
+    hm2 = rtapi_alloc(sizeof(hostmot2_t), GFP_KERNEL);
     if (hm2 == NULL) {
         HM2_PRINT_NO_LL("out of memory!\n");
         return -ENOMEM;
@@ -982,7 +983,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
     if ((llio->program_fpga != NULL) && (hm2->config.firmware != NULL)) {
         const struct firmware *fw;
         bitfile_t bitfile;
-        struct device dev;
+        struct rtapi_device dev;
 
         // check firmware name length
         if (strlen(hm2->config.firmware) > FIRMWARE_NAME_MAX) {
@@ -992,21 +993,16 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
         }
 
         memset(&dev, '\0', sizeof(dev));
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
-        strncpy(dev.bus_id, hm2->llio->name, BUS_ID_SIZE);
-        dev.bus_id[BUS_ID_SIZE - 1] = '\0';
-#else
-        dev_set_name(&dev, hm2->llio->name);
-#endif
+        rtapi_device_set_name(&dev, hm2->llio->name);
         dev.release = hm2_release_device;
-        r = device_register(&dev);
+        r = rtapi_device_register(&dev);
         if (r != 0) {
             HM2_ERR("error with device_register\n");
             goto fail0;
         }
 
-        r = request_firmware(&fw, hm2->config.firmware, &dev);
-        device_unregister(&dev);
+        r = rtapi_request_firmware(&fw, hm2->config.firmware, &dev);
+        rtapi_device_unregister(&dev);
         if (r == -ENOENT) {
             HM2_ERR("firmware %s not found\n", hm2->config.firmware);
             HM2_ERR("install the package containing the firmware.\n");
@@ -1020,7 +1016,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
         r = bitfile_parse_and_verify(fw, &bitfile);
         if (r != 0) {
             HM2_ERR("firmware %s fails verification, aborting hm2_register\n", hm2->config.firmware);
-            release_firmware(fw);
+            rtapi_release_firmware(fw);
             goto fail0;
         }
 
@@ -1039,7 +1035,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
                     hm2->config.firmware,
                     bitfile.b.data
                 );
-                release_firmware(fw);
+                rtapi_release_firmware(fw);
                 r = -EINVAL;
                 goto fail0;
             }
@@ -1048,14 +1044,14 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
         if (llio->reset != NULL) {
             r = llio->reset(llio);
             if (r != 0) {
-                release_firmware(fw);
+                rtapi_release_firmware(fw);
                 HM2_ERR("failed to reset fpga, aborting hm2_register\n");
                 goto fail0;
             }
         }
 
         r = llio->program_fpga(llio, &bitfile);
-        release_firmware(fw);
+        rtapi_release_firmware(fw);
         if (r != 0) {
             HM2_ERR("failed to program fpga, aborting hm2_register\n");
             goto fail0;
@@ -1352,11 +1348,11 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
 
 
 fail1:
-    hm2_cleanup(hm2);  // undoes the kmallocs from hm2_parse_module_descriptors()
+    hm2_cleanup(hm2);  // undoes the rtapi_allocs from hm2_parse_module_descriptors()
 
 fail0:
     list_del(&hm2->list);
-    kfree(hm2);
+    rtapi_free(hm2);
     return r;
 }
 
@@ -1383,7 +1379,7 @@ void hm2_unregister(hm2_lowlevel_io_t *llio) {
         hm2_cleanup(hm2);
 
         list_del(ptr);
-        kfree(hm2);
+        rtapi_free(hm2);
 
         return;
     }

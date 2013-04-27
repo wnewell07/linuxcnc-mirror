@@ -23,7 +23,7 @@
 //
 
 
-#include <linux/firmware.h>
+#include <rtapi_firmware.h>
 
 #include "rtapi.h"
 #include "rtapi_app.h"
@@ -38,7 +38,7 @@
 
 
 
-static int bitfile_do_small_chunk(const struct firmware *fw, bitfile_chunk_t *chunk, int *i) {
+static int bitfile_do_small_chunk(const struct rtapi_firmware *fw, bitfile_chunk_t *chunk, int *i) {
     if (*i + 2 > fw->size) {
         HM2_PRINT_NO_LL("bitfile chunk extends past end of firmware\n");
         return -ENODATA;
@@ -67,7 +67,7 @@ static int bitfile_do_small_chunk(const struct firmware *fw, bitfile_chunk_t *ch
 
 
 
-static int bitfile_do_big_chunk(const struct firmware *fw, bitfile_chunk_t *chunk, int *i) {
+static int bitfile_do_big_chunk(const struct rtapi_firmware *fw, bitfile_chunk_t *chunk, int *i) {
     if (*i + 4 > fw->size) {
         HM2_PRINT_NO_LL("bitfile chunk extends past end of firmware\n");
         return -ENODATA;
@@ -90,7 +90,7 @@ static int bitfile_do_big_chunk(const struct firmware *fw, bitfile_chunk_t *chun
 
 
 
-static int bitfile_parse_and_verify_chunk(const struct firmware *fw, bitfile_t *bitfile, int *i) {
+static int bitfile_parse_and_verify_chunk(const struct rtapi_firmware *fw, bitfile_t *bitfile, int *i) {
     char tag;
 
     tag = fw->data[*i];
@@ -136,7 +136,7 @@ static int bitfile_parse_and_verify_chunk(const struct firmware *fw, bitfile_t *
 
 #define BITFILE_HEADERLEN 13
 
-int bitfile_parse_and_verify(const struct firmware *fw, bitfile_t *bitfile) {
+int bitfile_parse_and_verify(const struct rtapi_firmware *fw, bitfile_t *bitfile) {
     int i;
     int r;
 

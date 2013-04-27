@@ -18,7 +18,7 @@
 //
 
 #include "rtapi_math.h"
-#include <linux/slab.h>
+#include "rtapi_slab.h"
 #include "hal/drivers/mesa-hostmot2/hostmot2.h"
 
 /****************/
@@ -43,7 +43,7 @@ int hm2_8i20_create(hostmot2_t *hm2, hm2_module_descriptor_t *md) {
 
 
         inst->tram_8i20 =
-        (hm2_sserial_tram_t *)kmalloc(inst->num_8i20 * sizeof(hm2_sserial_tram_t),
+        (hm2_sserial_tram_t *)rtapi_alloc(inst->num_8i20 * sizeof(hm2_sserial_tram_t),
                                       GFP_KERNEL);
         if (inst->tram_8i20 == NULL) {
             HM2_ERR("out of memory!\n");
@@ -349,7 +349,7 @@ void hm2_sserial_8i20_cleanup(hostmot2_t *hm2){
     int i;
     for (i = 1 ; i < hm2->sserial.num_instances; i++){
         if (hm2->sserial.instance[i].tram_8i20 != NULL){
-            kfree(hm2->sserial.instance[i].tram_8i20);
+            rtapi_free(hm2->sserial.instance[i].tram_8i20);
         }
     }
 }

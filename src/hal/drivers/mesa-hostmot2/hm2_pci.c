@@ -18,11 +18,10 @@
 //
 
 
-#include <linux/pci.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
+#include "rtapi_pci.h"
 
 #include "hal.h"
 
@@ -394,7 +393,7 @@ static int hm2_plx9054_reset(hm2_lowlevel_io_t *this) {
 //
 
 
-static int hm2_pci_probe(struct pci_dev *dev, const struct pci_device_id *id) {
+static int hm2_pci_probe(struct rtapi_pci_dev *dev, const struct rtapi_pci_device_id *id) {
     int r;
     hm2_pci_t *board;
     hm2_lowlevel_io_t *this;
@@ -590,12 +589,12 @@ static int hm2_pci_probe(struct pci_dev *dev, const struct pci_device_id *id) {
         case HM2_PCI_DEV_PLX9030: {
             // get a hold of the IO resources we'll need later
             // FIXME: should request_region here
-            board->ctrl_base_addr = pci_resource_start(dev, 1);
-            board->data_base_addr = pci_resource_start(dev, 2);
+            board->ctrl_base_addr = rtapi_pci_resource_start(dev, 1);
+            board->data_base_addr = rtapi_pci_resource_start(dev, 2);
 
             // BAR 5 is 64K mem (32 bit)
-            board->len = pci_resource_len(dev, 5);
-            board->base = ioremap_nocache(pci_resource_start(dev, 5), board->len);
+            board->len = rtapi_pci_resource_len(dev, 5);
+            board->base = rtapi_pci_ioremap_bar(dev, 5);
             if (board->base == NULL) {
                 THIS_ERR("could not map in FPGA address space\n");
                 r = -ENODEV;
@@ -617,8 +616,8 @@ static int hm2_pci_probe(struct pci_dev *dev, const struct pci_device_id *id) {
             board->data_base_addr = pci_resource_start(dev, 2);
 
             // BAR 3 is 64K mem (32 bit)
-            board->len = pci_resource_len(dev, 3);
-            board->base = ioremap_nocache(pci_resource_start(dev,3), board->len);
+            board->len = rtapi_pci_resource_len(dev, 3);
+            board->base = rtapi_pci_ioremap_bar(dev, 3);
             if (board->base == NULL) {
                 THIS_ERR("could not map in FPGA address space\n");
                 r = -ENODEV;
@@ -634,8 +633,8 @@ static int hm2_pci_probe(struct pci_dev *dev, const struct pci_device_id *id) {
         case HM2_PCI_DEV_MESA5I25:
         case HM2_PCI_DEV_MESA6I25: {
               // BAR 0 is 64K mem (32 bit)
-            board->len = pci_resource_len(dev, 0);
-            board->base = ioremap_nocache(pci_resource_start(dev,0), board->len);
+            board->len = rtapi_pci_resource_len(dev, 0);
+            board->base = rtapi_pci_ioremap_bar(dev, 0);
             if (board->base == NULL) {
                 THIS_ERR("could not map in FPGA address space\n");
                 r = -ENODEV;
@@ -677,12 +676,12 @@ static int hm2_pci_probe(struct pci_dev *dev, const struct pci_device_id *id) {
 
 
 fail1:
-    pci_set_drvdata(dev, NULL);
+    rtapi_pci_set_drvdata(dev, NULL);
     iounmap(board->base);
     board->base = NULL;
 
 fail0:
-    pci_disable_device(dev);
+    rtapi_pci_disable_device(dev);
     return failed_errno = r;
 }
 

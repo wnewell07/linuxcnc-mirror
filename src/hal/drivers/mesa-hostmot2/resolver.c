@@ -23,7 +23,7 @@
 //
 
 
-#include <linux/slab.h>
+#include "rtapi_slab.h"
 
 #include "rtapi.h"
 #include "rtapi_app.h"
@@ -279,7 +279,7 @@ int hm2_resolver_parse_md(hostmot2_t *hm2, int md_index) {
     return hm2->resolver.num_instances;
     
 fail1:
-    // This is where we would kfree anything kmalloced. 
+    // This is where we would rtapi_free anything rtapi_alloced. 
     
     
 fail0:
@@ -411,7 +411,7 @@ void hm2_resolver_write(hostmot2_t *hm2, long period){
     
 void hm2_resolver_cleanup(hostmot2_t *hm2) {
     if (hm2->resolver.num_instances <= 0) return;
-    // nothing kmallocced, so nothing to kfree
+    // nothing rtapi_allocced, so nothing to rtapi_free
 }
 
 

@@ -22,7 +22,7 @@
 // into one file too, though it will be a biggie. 
 
 
-#include <linux/slab.h>
+#include "rtapi_slab.h"
 
 #include "rtapi.h"
 #include "rtapi_app.h"

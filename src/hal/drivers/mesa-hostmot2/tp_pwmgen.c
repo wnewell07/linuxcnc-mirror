@@ -17,12 +17,11 @@
 //    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 //
 
-#include <linux/slab.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
+#include "rtapi_slab.h"
 
 #include "hal.h"
 
@@ -270,13 +269,13 @@ int hm2_tp_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
     hm2->tp_pwmgen.setup_addr = md->base_address + (2 * md->register_stride);
 
     //Allocate some memory for the parameter registers. The value equivalent is handled in the tram section
-    hm2->tp_pwmgen.setup_reg = (u32 *)kmalloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->tp_pwmgen.setup_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->tp_pwmgen.setup_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
-    hm2->tp_pwmgen.enable_reg = (u32 *)kmalloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->tp_pwmgen.enable_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->tp_pwmgen.enable_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -400,10 +399,10 @@ int hm2_tp_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
     return hm2->tp_pwmgen.num_instances;
 
 fail2:
-    kfree(hm2->tp_pwmgen.enable_reg);
+    rtapi_free(hm2->tp_pwmgen.enable_reg);
 
 fail1:
-    kfree(hm2->tp_pwmgen.setup_reg);
+    rtapi_free(hm2->tp_pwmgen.setup_reg);
 
 fail0:
     hm2->tp_pwmgen.num_instances = 0;
@@ -475,11 +474,11 @@ void hm2_tp_pwmgen_prepare_tram_write(hostmot2_t *hm2) {
 void hm2_tp_pwmgen_cleanup(hostmot2_t *hm2) {
     if (hm2->tp_pwmgen.num_instances <= 0) return;
     if (hm2->tp_pwmgen.setup_reg != NULL) {
-        kfree(hm2->tp_pwmgen.setup_reg);
+        rtapi_free(hm2->tp_pwmgen.setup_reg);
         hm2->tp_pwmgen.enable_reg = NULL;
     }
     if (hm2->tp_pwmgen.enable_reg != NULL) {
-        kfree(hm2->tp_pwmgen.enable_reg);
+        rtapi_free(hm2->tp_pwmgen.enable_reg);
         hm2->tp_pwmgen.enable_reg = NULL;
     }
     hm2->tp_pwmgen.num_instances = 0;

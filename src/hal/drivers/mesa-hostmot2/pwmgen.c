@@ -17,12 +17,11 @@
 //    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
 //
 
-#include <linux/slab.h>
-
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
+#include "rtapi_slab.h"
 
 #include "hal.h"
 
@@ -412,7 +411,7 @@ int hm2_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
         goto fail0;
     }
 
-    hm2->pwmgen.pwm_mode_reg = (u32 *)kmalloc(hm2->pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->pwmgen.pwm_mode_reg = (u32 *)rtapi_alloc(hm2->pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
     if (hm2->pwmgen.pwm_mode_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -511,7 +510,7 @@ int hm2_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
 
 
 fail1:
-    kfree(hm2->pwmgen.pwm_mode_reg);
+    rtapi_free(hm2->pwmgen.pwm_mode_reg);
 
 fail0:
     hm2->pwmgen.num_instances = 0;
@@ -524,7 +523,7 @@ fail0:
 void hm2_pwmgen_cleanup(hostmot2_t *hm2) {
     if (hm2->pwmgen.num_instances <= 0) return;
     if (hm2->pwmgen.pwm_mode_reg != NULL) {
-        kfree(hm2->pwmgen.pwm_mode_reg);
+        rtapi_free(hm2->pwmgen.pwm_mode_reg);
         hm2->pwmgen.pwm_mode_reg = NULL;
     }
     hm2->pwmgen.num_instances = 0;

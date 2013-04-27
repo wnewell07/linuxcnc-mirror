@@ -102,7 +102,7 @@ char **argv_split(gfp_t gfp, const char *str, int *argcp)
 
 			str = skip_arg(str);
 
-			t = kstrndup(p, str-p, gfp);
+			t = rtapi_strndup(p, str-p, gfp);
 			if (t == NULL)
 				goto fail;
 			*argvp++ = t;
