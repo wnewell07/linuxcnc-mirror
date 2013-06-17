@@ -793,6 +793,7 @@ RTAPI_BEGIN_DECLS
 #define MODULE_DESCRIPTION(s) MODULE_INFO1(const char*, description, s)
 #define EXPORT_SYMBOL(x) __attribute__((section(".rtapi_export"))) \
     char rtapi_exported_##x[] = #x;
+#define EXPORT_SYMBOL_GPL EXPORT_SYMBOL
 #endif
 
 #if !defined(RTAPI_SIM)
