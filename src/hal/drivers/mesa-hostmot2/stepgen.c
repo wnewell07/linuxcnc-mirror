@@ -18,7 +18,6 @@
 //
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -614,35 +613,35 @@ int hm2_stepgen_parse_md(hostmot2_t *hm2, int md_index) {
         goto fail0;
     }
 
-    hm2->stepgen.mode_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->stepgen.mode_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->stepgen.mode_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail0;
     }
 
-    hm2->stepgen.dir_setup_time_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->stepgen.dir_setup_time_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->stepgen.dir_setup_time_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
 
-    hm2->stepgen.dir_hold_time_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->stepgen.dir_hold_time_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->stepgen.dir_hold_time_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail2;
     }
 
-    hm2->stepgen.pulse_width_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->stepgen.pulse_width_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->stepgen.pulse_width_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail3;
     }
 
-    hm2->stepgen.pulse_idle_width_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->stepgen.pulse_idle_width_reg = (u32 *)rtapi_alloc(hm2->stepgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->stepgen.pulse_idle_width_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;

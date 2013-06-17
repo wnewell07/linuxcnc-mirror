@@ -27,6 +27,7 @@
 #define __BITFILE_H
 
 #include <rtapi_firmware.h>
+#include <rtapi_inttypes.h>
 
 typedef struct {
     int size;

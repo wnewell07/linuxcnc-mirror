@@ -33,12 +33,13 @@
 
 
 
-
+#ifdef MODULE_INFO
 MODULE_INFO(linuxcnc, "component:hostmot2:RTAI driver for the HostMot2 firmware from Mesa Electronics.");
 MODULE_INFO(linuxcnc, "funct:read:1:Read all registers.");
 MODULE_INFO(linuxcnc, "funct:write:1:Write all registers.");
 MODULE_INFO(linuxcnc, "funct:pet_watchdog:0:Pet the watchdog to keep it from biting us for a while.");
 MODULE_INFO(linuxcnc, "license:GPL");
+#endif
 
 MODULE_LICENSE("GPL");
 
@@ -59,7 +60,7 @@ RTAPI_MP_INT(debug_modules, "Developer/debug use only!  Enable debug logging of 
 
 // this keeps track of all the hm2 instances that have been registered by
 // the low-level drivers
-struct list_head hm2_list;
+struct rtapi_list_head hm2_list;
 
 
 static int comp_id;
@@ -180,7 +181,7 @@ const char *hm2_hz_to_mhz(u32 freq_hz) {
 
     freq_mhz = freq_hz / (1000*1000);
     freq_mhz_fractional = (freq_hz / 1000) % 1000;
-    r = snprintf(mhz_str, sizeof(mhz_str), "%d.%03d", freq_mhz, freq_mhz_fractional);
+    r = rtapi_snprintf(mhz_str, sizeof(mhz_str), "%d.%03d", freq_mhz, freq_mhz_fractional);
     if (r >= sizeof(mhz_str)) {
         HM2_ERR_NO_LL("too many MHz!\n");
         return "(unpresentable)";
@@ -235,7 +236,7 @@ static int hm2_parse_config_string(hostmot2_t *hm2, char *config_string) {
 
     HM2_DBG("parsing config string \"%s\"\n", config_string);
 
-    argv = rtapi_argv_split(GFP_KERNEL, config_string, &argc);
+    argv = rtapi_argv_split(RTAPI_GFP_KERNEL, config_string, &argc);
     if (argv == NULL) {
         HM2_ERR("out of memory while parsing config string\n");
         return -ENOMEM;
@@ -337,7 +338,7 @@ static int hm2_parse_config_string(hostmot2_t *hm2, char *config_string) {
     return 0;
 
 fail:
-    argv_free(argv);
+    rtapi_argv_free(argv);
     return -EINVAL;
 }
 
@@ -835,7 +836,7 @@ void hm2_print_modules(hostmot2_t *hm2) {
 //
 
 
-static void hm2_release_device(struct device *dev) {
+static void hm2_release_device(struct rtapi_device *dev) {
     // nothing to do here
 }
 
@@ -947,7 +948,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
     // make a hostmot2_t struct to represent this device
     //
 
-    hm2 = rtapi_alloc(sizeof(hostmot2_t), GFP_KERNEL);
+    hm2 = rtapi_alloc(sizeof(hostmot2_t), RTAPI_GFP_KERNEL);
     if (hm2 == NULL) {
         HM2_PRINT_NO_LL("out of memory!\n");
         return -ENOMEM;
@@ -957,11 +958,11 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
 
     hm2->llio = llio;
 
-    INIT_LIST_HEAD(&hm2->tram_read_entries);
-    INIT_LIST_HEAD(&hm2->tram_write_entries);
+    RTAPI_INIT_LIST_HEAD(&hm2->tram_read_entries);
+    RTAPI_INIT_LIST_HEAD(&hm2->tram_write_entries);
 
     // tentatively add it to the hm2 list
-    list_add_tail(&hm2->list, &hm2_list);
+    rtapi_list_add_tail(&hm2->list, &hm2_list);
 
 
     //
@@ -981,7 +982,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
     //
 
     if ((llio->program_fpga != NULL) && (hm2->config.firmware != NULL)) {
-        const struct firmware *fw;
+        const struct rtapi_firmware *fw;
         bitfile_t bitfile;
         struct rtapi_device dev;
 
@@ -1028,7 +1029,7 @@ int hm2_register(hm2_lowlevel_io_t *llio, char *config_string) {
         if (llio->fpga_part_number == NULL) {
             HM2_ERR("llio did not provide an FPGA part number, cannot verify firmware part number\n");
         } else {
-            if (strcmp(llio->fpga_part_number, bitfile.b.data) != 0) {
+            if (strcmp(llio->fpga_part_number, (char *)bitfile.b.data) != 0) {
                 HM2_ERR(
                     "board has FPGA '%s', but the firmware in %s is for FPGA '%s'\n",
                     llio->fpga_part_number,
@@ -1351,7 +1352,7 @@ fail1:
     hm2_cleanup(hm2);  // undoes the rtapi_allocs from hm2_parse_module_descriptors()
 
 fail0:
-    list_del(&hm2->list);
+    rtapi_list_del(&hm2->list);
     rtapi_free(hm2);
     return r;
 }
@@ -1361,10 +1362,10 @@ fail0:
 
 EXPORT_SYMBOL_GPL(hm2_unregister);
 void hm2_unregister(hm2_lowlevel_io_t *llio) {
-    struct list_head *ptr;
+    struct rtapi_list_head *ptr;
 
-    list_for_each(ptr, &hm2_list) {
-        hostmot2_t *hm2 = list_entry(ptr, hostmot2_t, list);
+    rtapi_list_for_each(ptr, &hm2_list) {
+        hostmot2_t *hm2 = rtapi_list_entry(ptr, hostmot2_t, list);
         if (hm2->llio != llio) continue;
 
         // if there's a watchdog, set it to safe the board right away
@@ -1378,7 +1379,7 @@ void hm2_unregister(hm2_lowlevel_io_t *llio) {
 
         hm2_cleanup(hm2);
 
-        list_del(ptr);
+        rtapi_list_del(ptr);
         rtapi_free(hm2);
 
         return;
@@ -1400,7 +1401,7 @@ int rtapi_app_main(void) {
 
     comp_id = hal_init("hostmot2");
     if(comp_id < 0) return comp_id;
-    INIT_LIST_HEAD(&hm2_list);
+    RTAPI_INIT_LIST_HEAD(&hm2_list);
 
     hal_ready(comp_id);
 

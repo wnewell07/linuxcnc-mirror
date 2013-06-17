@@ -18,7 +18,6 @@
 //
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -169,21 +168,21 @@ int hm2_watchdog_parse_md(hostmot2_t *hm2, int md_index) {
     // allocate memory for register buffers
     //
 
-    hm2->watchdog.status_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.status_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->watchdog.status_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail0;
     }
 
-    hm2->watchdog.reset_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.reset_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->watchdog.reset_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
 
-    hm2->watchdog.timer_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->watchdog.timer_reg = (u32 *)rtapi_alloc(hm2->watchdog.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->watchdog.timer_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;

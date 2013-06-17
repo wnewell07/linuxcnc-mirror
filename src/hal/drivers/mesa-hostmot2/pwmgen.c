@@ -18,7 +18,6 @@
 //
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -411,7 +410,7 @@ int hm2_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
         goto fail0;
     }
 
-    hm2->pwmgen.pwm_mode_reg = (u32 *)rtapi_alloc(hm2->pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->pwmgen.pwm_mode_reg = (u32 *)rtapi_alloc(hm2->pwmgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->pwmgen.pwm_mode_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;

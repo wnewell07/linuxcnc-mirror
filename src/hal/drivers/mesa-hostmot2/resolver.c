@@ -26,7 +26,6 @@
 #include "rtapi_slab.h"
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 

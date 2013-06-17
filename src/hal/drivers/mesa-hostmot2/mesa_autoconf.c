@@ -49,7 +49,7 @@ int hm2_auto_create(hostmot2_t *hm2, hm2_module_descriptor_t *md) {
         
         inst->tram_auto =
         (hm2_sserial_tram_t *)rtapi_alloc(inst->num_auto * sizeof(hm2_sserial_tram_t),
-                                      GFP_KERNEL);
+                                      RTAPI_GFP_KERNEL);
         if (inst->tram_auto == NULL) {
             HM2_ERR("out of memory!\n");
             return -ENOMEM;
@@ -265,7 +265,7 @@ int hm2_sserial_auto_read_configs(hostmot2_t *hm2, hm2_sserial_tram_t *tram, hal
             chan->num_confs++;
             chan->conf = (hm2_sserial_data_t *)rtapi_realloc(chan->conf, 
                           chan->num_confs * sizeof(hm2_sserial_data_t),
-                          GFP_KERNEL);
+                          RTAPI_GFP_KERNEL);
             addr = hm2_sserial_get_bytes(hm2, tram, &chan->conf[chan->num_confs-1], addr, 14);
             if (addr < 0){ return -EINVAL;}
             addr = hm2_sserial_get_bytes(hm2, tram, 
@@ -291,7 +291,7 @@ int hm2_sserial_auto_read_configs(hostmot2_t *hm2, hm2_sserial_tram_t *tram, hal
             chan->num_modes++;
             chan->modes = (hm2_sserial_mode_t *)rtapi_realloc(chan->modes, 
                            chan->num_modes * sizeof(hm2_sserial_mode_t),
-                           GFP_KERNEL);
+                           RTAPI_GFP_KERNEL);
             addr = hm2_sserial_get_bytes(hm2, tram, &chan->modes[chan->num_modes-1], addr, 4);
             if (addr < 0){ return -EINVAL;}
             addr = hm2_sserial_get_bytes(hm2, tram, 

@@ -21,7 +21,6 @@
 
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -70,7 +69,7 @@ int hm2_led_parse_md(hostmot2_t *hm2, int md_index) {
         r = -ENOMEM;
         goto fail0;
     }
-    hm2->led.led_reg = (u32 *)rtapi_alloc( sizeof(u32), GFP_KERNEL);
+    hm2->led.led_reg = (u32 *)rtapi_alloc( sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->led.led_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;

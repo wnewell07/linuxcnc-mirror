@@ -23,6 +23,7 @@
 #define UINT32_MAX (4294967295U)
 
 #include "rtapi.h"
+#include "rtapi_list.h"
 #include "hal.h"
 
 #include "hostmot2-lowlevel.h"
@@ -929,7 +930,7 @@ typedef struct {
     u16 addr;
     u16 size;
     u32 **buffer;
-    struct list_head list;
+    struct rtapi_list_head list;
 } hm2_tram_entry_t;
 
 
@@ -967,11 +968,11 @@ typedef struct {
     int num_pins;
 
     // this keeps track of all the tram entries
-    struct list_head tram_read_entries;
+    struct rtapi_list_head tram_read_entries;
     u32 *tram_read_buffer;
     u16 tram_read_size;
 
-    struct list_head tram_write_entries;
+    struct rtapi_list_head tram_write_entries;
     u32 *tram_write_buffer;
     u16 tram_write_size;
 
@@ -988,7 +989,7 @@ typedef struct {
 
     hm2_raw_t *raw;
 
-    struct list_head list;
+    struct rtapi_list_head list;
 } hostmot2_t;
 
 

@@ -130,7 +130,7 @@
 
 typedef struct {
     struct rtapi_pci_dev *dev;
-    void __iomem *base;
+    void rtapi_iomem *base;
     int len;
     unsigned long ctrl_base_addr;
     unsigned long data_base_addr;

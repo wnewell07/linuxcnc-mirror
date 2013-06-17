@@ -44,7 +44,7 @@ int hm2_8i20_create(hostmot2_t *hm2, hm2_module_descriptor_t *md) {
 
         inst->tram_8i20 =
         (hm2_sserial_tram_t *)rtapi_alloc(inst->num_8i20 * sizeof(hm2_sserial_tram_t),
-                                      GFP_KERNEL);
+                                      RTAPI_GFP_KERNEL);
         if (inst->tram_8i20 == NULL) {
             HM2_ERR("out of memory!\n");
             r = -ENOMEM;

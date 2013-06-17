@@ -18,7 +18,6 @@
 //
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -90,7 +89,7 @@ int hm2_ioport_parse_md(hostmot2_t *hm2, int md_index) {
         goto fail0;
     }
 
-    hm2->ioport.ddr_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.ddr_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.ddr_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -98,21 +97,21 @@ int hm2_ioport_parse_md(hostmot2_t *hm2, int md_index) {
     }
 
     // this one's not a real register
-    hm2->ioport.written_ddr = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.written_ddr = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.written_ddr == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
 
-    hm2->ioport.alt_source_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.alt_source_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.alt_source_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail2;
     }
 
-    hm2->ioport.open_drain_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.open_drain_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.open_drain_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -120,14 +119,14 @@ int hm2_ioport_parse_md(hostmot2_t *hm2, int md_index) {
     }
 
     // this one's not a real register
-    hm2->ioport.written_open_drain = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.written_open_drain = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.written_open_drain == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail4;
     }
 
-    hm2->ioport.output_invert_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.output_invert_reg = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.output_invert_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
@@ -135,7 +134,7 @@ int hm2_ioport_parse_md(hostmot2_t *hm2, int md_index) {
     }
 
     // this one's not a real register
-    hm2->ioport.written_output_invert = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->ioport.written_output_invert = (u32 *)rtapi_alloc(hm2->ioport.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->ioport.written_output_invert == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;

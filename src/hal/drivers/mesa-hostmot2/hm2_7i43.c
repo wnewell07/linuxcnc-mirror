@@ -18,12 +18,12 @@
 //
 
 
-#include <asm/io.h>
 
 #include "rtapi.h"
 #include "rtapi_app.h"
 #include "rtapi_math.h"
 #include "rtapi_string.h"
+#include "rtapi_io.h"
 
 #include "hal.h"
 

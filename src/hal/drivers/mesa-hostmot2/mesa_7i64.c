@@ -41,7 +41,7 @@ int hm2_7i64_create(hostmot2_t *hm2, hm2_module_descriptor_t *md) {
 
         inst->tram_7i64 =
         (hm2_sserial_tram_t *)rtapi_alloc(inst->num_7i64 * sizeof(hm2_sserial_tram_t),
-                                      GFP_KERNEL);
+                                      RTAPI_GFP_KERNEL);
         if (inst->tram_7i64 == NULL) {
             HM2_ERR("out of memory!\n");
             r = -ENOMEM;

@@ -18,7 +18,6 @@
 //
 
 #include "rtapi.h"
-#include "rtapi_app.h"
 #include "rtapi_string.h"
 #include "rtapi_math.h"
 #include "rtapi_slab.h"
@@ -269,13 +268,13 @@ int hm2_tp_pwmgen_parse_md(hostmot2_t *hm2, int md_index) {
     hm2->tp_pwmgen.setup_addr = md->base_address + (2 * md->register_stride);
 
     //Allocate some memory for the parameter registers. The value equivalent is handled in the tram section
-    hm2->tp_pwmgen.setup_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->tp_pwmgen.setup_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->tp_pwmgen.setup_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
         goto fail1;
     }
-    hm2->tp_pwmgen.enable_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), GFP_KERNEL);
+    hm2->tp_pwmgen.enable_reg = (u32 *)rtapi_alloc(hm2->tp_pwmgen.num_instances * sizeof(u32), RTAPI_GFP_KERNEL);
     if (hm2->tp_pwmgen.enable_reg == NULL) {
         HM2_ERR("out of memory!\n");
         r = -ENOMEM;
