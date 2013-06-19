@@ -355,6 +355,37 @@ static int slave(int fd, vector<string> args) {
 }
 
 static int master(int fd, vector<string> args) {
+#if defined(BUILD_DRIVERS)
+    /* Latency trick
+     * if the file /dev/cpu_dma_latency exists,
+     * open it and write a zero into it. This will tell
+     * the power management system not to transition to
+     * a high cstate (in fact, the system acts like idle=poll)
+     * When the fd to /dev/cpu_dma_latency is closed, the behavior
+     * goes back to the system default.
+     *
+     * Documentation/power/pm_qos_interface.txt
+     */
+    do {
+        struct stat s;
+        int ret;
+
+        if (stat("/dev/cpu_dma_latency", &s) == 0) {
+                int latency_target_fd = open("/dev/cpu_dma_latency", O_RDWR);
+                if (latency_target_fd == -1)
+                        continue;
+		int32_t latency_target_value = 0;
+                ret = write(latency_target_fd, &latency_target_value, 4);
+                if (ret == 0) {
+                        printf("# error setting cpu_dma_latency to %d!: %s\n", latency_target_value, strerror(errno));
+                        close(latency_target_fd);
+                        continue;
+                }
+                rtapi_print_msg(RTAPI_MSG_ERR, "# /dev/cpu_dma_latency set to %dus\n", latency_target_value);
+        }
+    } while(0);
+#endif
+
     dlopen(NULL, RTLD_GLOBAL);
     do_load_cmd("hal_lib", vector<string>()); instance_count = 0;
     if(args.size()) { 
