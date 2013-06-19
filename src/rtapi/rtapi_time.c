@@ -136,6 +136,33 @@ long int rtapi_delay_max(void)
     return max_delay;
 }
 
+#ifdef HAVE_RTAPI_GET_ACTUAL_TIME_HOOK
+extern long long rtapi_get_time_hook();
+#endif
+
+long long rtapi_get_actual_time()
+{
+#ifdef HAVE_RTAPI_GET_ACTUAL_TIME_HOOK
+	return rtapi_get_actual_time_hook();
+#else
+	return -1LL;
+#endif
+}
+
+
+#ifdef HAVE_RTAPI_GET_NOMINAL_TIME_HOOK
+extern long long rtapi_get_time_hook();
+#endif
+
+long long rtapi_get_nominal_time()
+{
+#ifdef HAVE_RTAPI_GET_NOMINAL_TIME_HOOK
+	return rtapi_get_nominal_time_hook();
+#else
+	return -1LL;
+#endif
+}
+
 #endif /* RTAPI */
 
 /* The following functions are common to both RTAPI and ULAPI */
@@ -188,6 +215,8 @@ long long int rtapi_get_clocks(void) {
 
 #ifdef MODULE
 EXPORT_SYMBOL(rtapi_clock_set_period);
+EXPORT_SYMBOL(rtapi_get_nominal_time);
+EXPORT_SYMBOL(rtapi_get_actual_time);
 EXPORT_SYMBOL(rtapi_get_time);
 EXPORT_SYMBOL(rtapi_get_clocks);
 EXPORT_SYMBOL(rtapi_delay);

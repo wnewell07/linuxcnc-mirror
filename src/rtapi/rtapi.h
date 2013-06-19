@@ -366,6 +366,19 @@ RTAPI_BEGIN_DECLS
 */
     extern long long int rtapi_get_time(void);
 
+#ifdef RTAPI
+/**
+   rtapi_get_nominal time returns the nominal time that this thread iteration
+   should have started, if available.  Otherwise it returns -1.
+ */
+    extern long long int rtapi_get_nominal_time(void);
+/**
+   rtapi_get_nominal time returns the actual time that this thread iteration
+   should have started, if available.  Otherwise it returns -1.
+ */
+    extern long long int rtapi_get_actual_time(void);
+#endif
+
 /** rtapi_get_clocks returns the current time in CPU clocks.  It is 
     fast, since it just reads the TSC in the CPU instead of calling a
     kernel or RTOS function.  Of course, times measured in CPU clocks
