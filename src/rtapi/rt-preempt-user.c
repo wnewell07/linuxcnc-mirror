@@ -37,7 +37,7 @@ typedef struct {
     int deleted;
     int destroyed;
     int deadline_scheduling;
-    struct timespec next_time;
+    struct timespec next_time, nominal_time, actual_time;
 
     /* The realtime thread. */
     pthread_t thread;
@@ -412,6 +412,9 @@ static void *realtime_thread(void *arg) {
     pthread_barrier_wait(&extra_task_data[task_id(task)].thread_init_barrier);
 
     clock_gettime(CLOCK_MONOTONIC, &extra_task_data[task_id(task)].next_time);
+    extra_task_data[task_id(task)].nominal_time =
+	    extra_task_data[task_id(task)].actual_time =
+	    extra_task_data[task_id(task)].next_time;
     rtapi_advance_time(&extra_task_data[task_id(task)].next_time,
 		       task->period, 0);
 
@@ -490,9 +493,11 @@ int rtapi_wait_hook(void) {
     else
 	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
 			&extra_task_data[task_id(task)].next_time, NULL);
+    extra_task_data[task_id(task)].nominal_time = extra_task_data[task_id(task)].next_time;
     rtapi_advance_time(&extra_task_data[task_id(task)].next_time,
 		       task->period, 0);
     clock_gettime(CLOCK_MONOTONIC, &ts);
+    extra_task_data[task_id(task)].actual_time = ts;
     if (ts.tv_sec > extra_task_data[task_id(task)].next_time.tv_sec
 	|| (ts.tv_sec == extra_task_data[task_id(task)].next_time.tv_sec
 	    && ts.tv_nsec > extra_task_data[task_id(task)].next_time.tv_nsec)) {
@@ -521,6 +526,18 @@ int rtapi_wait_hook(void) {
     }
 
     return 0;
+}
+
+long long rtapi_get_nominal_time_hook() {
+    task_data *task = rtapi_this_task();
+    extra_task_data_t *taskdata = &extra_task_data[task_id(task)]; 
+    return taskdata->nominal_time.tv_sec * 1000000000LL + taskdata->nominal_time.tv_nsec;
+}
+
+long long rtapi_get_actual_time_hook() {
+    task_data *task = rtapi_this_task();
+    extra_task_data_t *taskdata = &extra_task_data[task_id(task)]; 
+    return taskdata->actual_time.tv_sec * 1000000000LL + taskdata->actual_time.tv_nsec;
 }
 
 void rtapi_delay_hook(long int nsec)

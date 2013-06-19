@@ -36,6 +36,11 @@ inline unsigned char rtapi_inb_hook(unsigned int port) { return 0; }
 #define HAVE_RTAPI_TASK_STOP_HOOK
 #define HAVE_RTAPI_WAIT_HOOK
 
+/* time */
+#ifdef RTAPI
+#define HAVE_RTAPI_GET_NOMINAL_TIME_HOOK
+#define HAVE_RTAPI_GET_ACTUAL_TIME_HOOK
+#endif
 
 /* misc */
 #define HAVE_RTAPI_TASK_FREE
