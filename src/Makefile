@@ -204,6 +204,13 @@ DEPS := $(sort $(patsubst %.o,%.d,$(CUSEROBJS) $(CXXUSEROBJS)))
 READ_DEPS = $(wildcard $(DEPS))
 $(shell echo 1>&2 Reading $(words $(READ_DEPS))/$(words $(DEPS)) dependency files)
 -include $(READ_DEPS)
+UNREAD_DEPS = $(filter-out $(READ_DEPS), $(DEPS))
+LEGACY_DEPS = $(patsubst objects/%, depends/%, $(UNREAD_DEPS))
+READ_LEGACY_DEPS = $(wildcard $(LEGACY_DEPS))
+ifneq ($(READ_LEGACY_DEPS),)
+$(shell echo 1>&2 Reading $(words $(READ_LEGACY_DEPS)) old-style dependency files)
+-include $(READ_LEGACY_DEPS)
+endif
 $(shell echo 1>&2 Done reading dependencies)
 endif
 
@@ -333,7 +340,6 @@ HEADERS := \
     emc/nml_intf/emccfg.h \
     emc/nml_intf/emcglb.h \
     emc/nml_intf/emcpos.h \
-    emc/nml_intf/interp.hh \
     emc/nml_intf/interp_return.hh \
     emc/nml_intf/interpl.hh \
     emc/nml_intf/motion_types.h \
