@@ -1,0 +1,64 @@
+= Contributing to LinuxCNC
+
+
+== Introduction
+
+This document describes the best practices for contributing code and
+documentation updates to LinuxCNC.
+
+If you are making modifications to the source, this document describes
+an effective way for you to communicate these changes to the rest of
+the developers on the project.  "Source" in this context means both
+the source code to the programs and libraries, and the source text for
+the documentation.
+
+
+== Background
+
+All of the source is maintained in the revision control system git
+footnote:[http://git-scm.com/].  We have some instructions on how
+to use git on our wiki, and some links to better git tutorials:
+http://wiki.linuxcnc.org/cgi-bin/wiki.pl?Git
+
+The official LinuxCNC git repo is at http://git.linuxcnc.org.
+
+There is also a regularly updated git clone on github:
+https://github.com/jepler/linuxcnc-mirror
+
+
+== Overview of the process
+
+The high-level overview of how to contribute changes to the source goes
+like this:
+
+* Communicate with the project developers and let us know what you're
+  hacking on
+
+* Clone the git repo
+
+* Commit the changes you desire to a local branch
+
+* Push your branch to a publicly visible git repo
+
+* Communicate the location of your branch to the project developers
+
+
+=== Communicating with the project developers
+
+The two main ways that project developers communicate with each other are:
+
+* Talk to us on IRC, at #linuxcnc-devel on FreeNode.
+
+* Send email to the developers' mailing list:
+  https://lists.sourceforge.net/lists/listinfo/emc-developers
+
+
+== Other ways to contribute
+
+There are many ways  to contribute to LinuxCNC, that are not addressed
+by this document.  These ways include:
+
+* Answering questions on the forum, mailing lists, and in IRC.
+
+* Reporting bugs on the bug tracker, forum, mailing lists, or in IRC
+

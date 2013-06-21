@@ -22,6 +22,8 @@ DOC_SRCS := \
 	code/Code_Notes.txt \
 	code/Style_Guide.txt \
 	code/NML_Messages.txt \
+	code/Using-git.txt \
+	code/Contributing-to-LinuxCNC.txt \
 	common/emc-history.txt \
 	common/Getting_EMC.txt \
 	common/Getting_EMC_de.txt \
