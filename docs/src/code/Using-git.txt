@@ -3,30 +3,39 @@
 
 == Introduction
 
-This document describes how to use git footnote:[http://git-scm.com/]
-with the LinuxCNC project.
+On June 20, 2009, the LinuxCNC project began using git
+footnote:[http://git-scm.com/] as its revision control
+system, replacing CVS. Read the announcement here:
+http://article.gmane.org/gmane.linux.distributions.emc.user/15046
 
-The intended audience is anyone who is curious about how LinuxCNC works,
-or who wants to develop bug fixes or new features.
+This document describes how to use git with the LinuxCNC project.
 
-
-
-
-
-
-
+The intended audience is anyone who wants to access or modify the
+LinuxCNC source.  "Source" in this context means both the source code
+to the programs and libraries, and the source text for the documentation.
 
 
-On June 20, 2009, the LinuxCNC project began using [git] as its revision
-control system, replacing CVS. [Read the announcement]
+== External git tutorials
 
-This page collects instructions and guidelines for using git with
-LinuxCNC. There is also a wealth of documentation for git, including
+Git is a very popular and very common revision control system, and there
+are many excellent, free git tutorials on the internet.
 
-[The git tutorial] (This has been "404 Not Found" lately, but will
-probably come back eventually.)  [The git tutorial (temporary)] (A
-link to Schacon's mirror of "gittutorial" until kernel.org gets back to
-normal. OK to delete this line later.)  [Everyday git] [Git for the lazy]
+The first place to look is probably the "gittutorial" manpage.
+This manpage is accessible by running "man gittutorial" in a
+terminal (if you have the git manpages installed), and online here:
+https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html
+
+For a more thorough git manual, see the "Pro Git" book, available for
+free online here: http://git-scm.com/book
+
+Some other online tutorials that have been recommended are:
+
+* http://schacon.github.io/git/everyday.html
+
+* http://wiki.spheredev.org/Git_for_the_lazy
+
+
+
 
 and full manpages for every git command (man git-clone or git --help
 clone)
@@ -40,9 +49,13 @@ git commit -a
 
 git format-patch OR git push
 
-1.  Prepare your system for development with git
 
-1.1.  Install git on your system
+
+
+
+==  Prepare your system for development with git
+
+===  Install git on your system
 
 In the package manager, select the package "git-core" (the package
 "git" is an unrelated program; don't choose it).  Optionally, select
@@ -56,21 +69,21 @@ and the new git packages will be available for installation.  (The git
 1.1 packages that shipped with dapper, and the git 1.5 packages in
 dapper-backports, are both not recommended for various reasons)
 
-1.2.  Configure your identity
+===  Configure your identity
 
-git config --global user.name "Your full name"
+`git config --global user.name "Your full name"`
 
-git config --global user.email "you@example.com"
+`git config --global user.email "you@example.com"`
 
 Use your real name (not a handle), and use an unobfuscated e-mail address.
 
-2.  Create an initial check-out
+==  Create an initial check-out
 
 "clone" is the git command that gets a copy of a project's history.
 It is roughly like "cvs co", except that the whole project history
 (not just the current working files) are available after a clone.
 
-2.1.  Anonymous checkouts
+===  Anonymous checkouts
 
 git clone git://git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev
 
@@ -82,7 +95,7 @@ the history, and you can make local commits (for your own use, or for
 sending to developers with commit access to the central repo).  You can
 not push back to the central repo from this repo.
 
-2.2.  Registered user checkouts
+===  Registered user checkouts
 
 If you are a registered developer with "push" access, use
 
@@ -90,14 +103,14 @@ git clone ssh://developername@git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev
 
 This creates a repo that can push back to the central repo.
 
-2.3.  About your cloned local repo
+===  About your cloned local repo
 
 Both of the clone commands above create a directory in your working
 directory called "linuxcnc-dev", containing a full clone of the
 linuxcnc.org git repo.  All the commands below assume that you are in
 the linuxcnc-dev directory unless noted otherwise.
 
-3.  View history
+==  View history
 
 Take a look at the history:
 
@@ -125,7 +138,7 @@ gitk --all qgit --all
 You can also [view the history online in gitweb], but viewing the history
 locally is often more powerful.
 
-4.  Commit changes
+==  Commit changes
 
 Edit some files and then commit the changes locally:
 
@@ -147,7 +160,7 @@ qgit
 In git, "commit" is a purely local operation.  See "Share your changes
 with others" below.
 
-4.1.  Commit message style
+===  Commit message style
 
 Keep commit messages around 72 columns wide (so that in a default-size
 terminal window, they don't wrap when shown by 'git log')
@@ -162,16 +175,16 @@ then a longer message explaining the change.  Example:
     you use in userspace (returns -1 for error) and in kernel space (returns
     -ERRNO for error)
 
-5.  Get changes from others
+==  Get changes from others
 
-5.1.  ...  from the central repository
+===  ...  from the central repository
 
 To get changes that have been committed to the location you originally
 cloned from:
 
 git pull
 
-5.2.  ...  from other repositories
+===  ...  from other repositories
 
 Pull changes made by another developer in his public repository but not
 yet committed to the central repository:
@@ -184,14 +197,14 @@ files and add some missing items to .gitignore)
 'git remote' can be used to manage short names for repositories that
 you frequently pull from.
 
-5.3.  ...  from patches
+===  ...  from patches
 
 Apply a patch from another developer, preserving the other developer's
 identity as the patch author:
 
 git am --signoff patch.mbox
 
-6.  Work with branches To list just the branches in your local repository:
+==  Work with branches To list just the branches in your local repository:
 
 git branch
 
@@ -220,7 +233,7 @@ git often uses "topic" as a placeholder for a branch name, because
 everything in a branch should be on one "topic"--a topic might be to add
 feature X, refactor subsystem Y, only fix bugs from version Z, and so on.
 
-6.1.  If you prefer to use different directories for different branches
+===  If you prefer to use different directories for different branches
 
 The following sequence creates "linuxcnc2.5-dev" alongside "linuxcnc-dev",
 then uses 'git relink' to save disk space, then switches to the
@@ -236,9 +249,9 @@ git branch v2_5_branch origin/v2_5_branch
 
 git checkout v2_5_branch
 
-7.  Share your changes with others
+==  Share your changes with others
 
-7.1.  Choose an appropriate starting point
+===  Choose an appropriate starting point
 
 For new features, use the git 'origin/master' branch as the
 starting point.
@@ -294,29 +307,33 @@ changes in the branch are merged up.
 For more information about why to structure bugfixes like this, see
 [gitworkflows: Merging Upwards].
 
-7.2.  Use multiple commits to organize changes When appropriate,
-organize your changes into a series of commits where each commit is
-a logical step towards your ultimate goal.  For example, first factor
-out some complex code into a new function.  Then, in a second commit,
-fix an underlying bug.  Then, in the third commit, add a new feature
-which is made easier by the refactoring and which would not have worked
-without fixing that bug.
+===  Use multiple commits to organize changes
+
+When appropriate, organize your changes into a series of commits where
+each commit is a logical step towards your ultimate goal.  For example,
+first factor out some complex code into a new function.  Then, in a
+second commit, fix an underlying bug.  Then, in the third commit, add
+a new feature which is made easier by the refactoring and which would
+not have worked without fixing that bug.
 
 This is helpful to reviewers, because it is easier to see that the
 "factor out code into new function" step was right when there aren't
 other edits mixed in; it's easier to see that the bug is fixed when the
 change that fixes it is separate from the new feature; and so on.
 
-7.3.  Follow the style of the surrounding code Make an effort to follow
-the prevailing indentation style of surrounding code.  In particular,
-changes to whitespace make it harder for other developers to track
-changes over time.  When reformatting code must be done, do it as a
-commit separate from any semantic changes.
+===  Follow the style of the surrounding code
 
-7.4.  Prepare commits to share with fellow developers With git, it's
-possible to record every edit and false start as a separate commit.
-This is very convenient as a way to create checkpoints during development,
-but often you don't want to share these false starts with others.
+Make an effort to follow the prevailing indentation style of surrounding
+code.  In particular, changes to whitespace make it harder for other
+developers to track changes over time.  When reformatting code must be
+done, do it as a commit separate from any semantic changes.
+
+===  Prepare commits to share with fellow developers
+
+With git, it's possible to record every edit and false start as a
+separate commit.  This is very convenient as a way to create checkpoints
+during development, but often you don't want to share these false starts
+with others.
 
 Git provides two main ways to do this, both of which can be done freely
 before you share the change:
@@ -330,7 +347,9 @@ possibly editing it or combining ('squashing') it with another change.
 In the most extreme case, you can 'squash' it into a single commit,
 if there's no value to other developers in seeing the individual steps.
 
-7.5.  Making sure every commit builds If your change consists of several
+===  Making sure every commit builds
+
+If your change consists of several
 patches, 'git rebase -i' may be used to reorder these patches into a
 sequence of commits which more clearly lays out the steps of your work.
 A potential consequence of reordering patches is that one might get
@@ -349,15 +368,16 @@ code at https://github.com/dustin/bindir/blob/master/git-test-sequence.
 Use as follows (in this case testing every commit from origin/master to
 HEAD, including running regression tests):
 
-$ cd linuxcnc-dev $ git-test-sequence origin/master..  '(cd
-src;make;runtests)'
+$ cd linuxcnc-dev
+$ git-test-sequence origin/master..  '(cd src;make;runtests)'
 
 This will either report 'All's well' or 'Broke on <commit>'
 
-7.6.  Send patches through e-mail or the web When you think your changes
-are ready to be used by others, you can share it in the form of a patch.
-Make a series of patches for each commit in your local branch but not in
-'origin':
+===  Send patches through e-mail or the web
+
+When you think your changes are ready to be used by others, you can share
+it in the form of a patch.  Make a series of patches for each commit in
+your local branch but not in 'origin':
 
 git format-patch -M origin
 
@@ -372,8 +392,10 @@ sending as e-mail with your favorite mail client or git-send-email
 To submit a patch, there are several different options:
 
 Submit it as an item on the sourceforge tracker:
+
 http://sourceforge.net/tracker/?group_id=6744 -- submit bugfixes in the
 "bugs" section.  submit improvements in the "feature requests" section.
+
 Subscribe to the emc-developers mailing list, and send the patch to the
 list as an attachment.  However, there is a 24kb limit on messages to
 this mailing list.  On the #linuxcnc-devel IRC channel, post a link to
@@ -393,12 +415,17 @@ questions about the workings of individual parts of the patch
 It is not uncommon for a patch to go through several revisions before
 it is accepted.
 
-7.7.  Push changes to the central repository If you've been approved to
-directly push your changes to the central repository, then after some
-initial setup of ssh keys it's a fairly simple process:
+===  Push changes to the central repository
 
-git pull # resolve # any # conflicts, # but # generally # there # won't #
-be # any git push
+If you've been approved to directly push your changes to the central
+repository, then after some initial setup of ssh keys it's a fairly
+simple process:
+
+git pull
+
+# resolve any conflicts, but generally there won't be any
+
+git push
 
 If another developer pushed between your pull and your push, you will
 have to pull and then push again.  This isn't expected to happen very
@@ -412,63 +439,82 @@ With git we will want to reevaluate how readily little-tested changes are
 pushed to 'master', since git provides so many more ways for developers
 to exchange patches and collaborate on new features.
 
-7.8.  Push changes to your own public repository You can host a public
-repository to which you "push" and from which others can "pull".  If you
-don't have a server of your own to do this, services like [1] and [2]
-are free for open source projects.  After you push to your own public
-repository, other developers can browse your changes or "pull" them.
+===  Push changes to your own public repository
 
-8.  Policy Just because a thing can be done with git doesn't mean it
-should be done.
+You can host a public repository to which you "push" and from which
+others can "pull".  If you don't have a server of your own to do this,
+services like [github] and [gitorious] are free for open source projects.
+After you push to your own public repository, other developers can browse
+your changes or "pull" them.
 
-8.1.  Renaming files Please use the ability to rename files very
-cautiously.  Like running indent on single files, renames still make it
-more difficult to follow changes over time.  At a minimum, you should seek
-consensus on irc or the mailing list that the rename is an improvement.
+==  Policy
 
-8.2.  Prefer "rebase" Use "git pull --rebase" instead of bare "git pull"
-in order to keep a nice linear history.  When you "--rebase", you always
-retain your work as revisions that are ahead of origin/master, so you
-can do things like git format-patch them to share with others without
-pushing to the central repository.
+Just because a thing can be done with git doesn't mean it should be done.
 
-9.  Tips and tricks 9.1.  Use a global ignore file for editor
-backups Different developers' editors use different backup file names.
+===  Renaming files
+
+Please use the ability to rename files very cautiously.  Like running
+indent on single files, renames still make it more difficult to follow
+changes over time.  At a minimum, you should seek consensus on irc or
+the mailing list that the rename is an improvement.
+
+===  Prefer "rebase"
+
+Use "git pull --rebase" instead of bare "git pull" in order to keep
+a nice linear history.  When you "--rebase", you always retain your
+work as revisions that are ahead of origin/master, so you can do things
+like git format-patch them to share with others without pushing to the
+central repository.
+
+==  Tips and tricks
+
+===  Use a global ignore file for editor backups
+
+Different developers' editors use different backup file names.
 Rather than put every possible editor backup file name in every project
 .gitignore, use a personal gitignore file to ignore your own editor
 backup files:
 
-git config --global core.excludesfile ~/.gitignore echo '*~' >>
-~/.gitignore
+`git config --global core.excludesfile ~/.gitignore`
+`echo '*~' >> ~/.gitignore`
 
 Now, the exclusion pattern '*~' will be applied in every directory of
 every git project you use.
 
-9.2.  Pull Script I made a little script that pulls and then loads
+===  Pull Script
+
+I made a little script that pulls and then loads
 the GUI.  Speeds the process up for me.  BJT
 
-#!/bin/bash clear cd linuxcnc-dev git pull git gui echo Git-R-Done!
+#!/bin/bash
+clear
+cd linuxcnc-dev
+git pull
+git gui
+echo Git-R-Done!
 
-9.3.  Copying to a USB stick If you get errors trying to copy your
-linuxcnc-dev directory to a usb stick then tar it up first.  From the
-directory above linuxcnc-dev
+===  Copying to a USB stick
 
-tar cvf linuxcnc-dev.tar linuxcnc-dev then copy linuxcnc-dev.tar to the
-stick then tar xvf /path/to/linuxcnc-dev.tar on the other system
+If you get errors trying to copy your linuxcnc-dev directory to a usb
+stick then tar it up first.  From the directory above linuxcnc-dev
+
+tar cvf linuxcnc-dev.tar linuxcnc-dev
+
+then copy linuxcnc-dev.tar to the stick
+
+then tar xvf /path/to/linuxcnc-dev.tar on the other system
 
 If your usb stick is memory challenged you can compress the the files
 by adding a z.  Like cvzf and xvzf.
 
-9.4.  Stash before pull To pull, you must have no uncommitted changes
-in your working tree.  If your local work is done, just commit it and
-then pull.
+===  Stash before pull
+
+To pull, you must have no uncommitted changes in your working tree.
+If your local work is done, just commit it and then pull.
 
 If you have work in progress that isn't ready to commit, "stash" it:
 
-git stash save git pull --rebase git stash apply
-
-LinuxCNCKnowledgeBase | RecentChanges | PageIndex | Preferences |
-LinuxCNC.org This page is read-only.  Follow the BasicSteps to edit
-pages.  | View other revisions Last edited April 1, 2012 5:29 pm by KimK
-(diff)Published under a Creative Commons License [feedly mini] k
+git stash save
+git pull --rebase
+git stash apply
 
