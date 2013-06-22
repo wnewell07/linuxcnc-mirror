@@ -24,7 +24,7 @@ are many excellent, free git tutorials on the internet.
 The first place to look is probably the "gittutorial" manpage.
 This manpage is accessible by running "man gittutorial" in a terminal
 (if you have the git manpages installed).  The gittutorial and its
-follow-on documentation are available online here:
+follow-on documentation are also available online here:
 
 * git tutorial:
   https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html
@@ -38,20 +38,31 @@ follow-on documentation are available online here:
 * Git User's Manual:
   https://www.kernel.org/pub/software/scm/git/docs/user-manual.html
 
-For a more thorough git manual, see the "Pro Git" book, available for
-free online here: http://git-scm.com/book
+For a more thorough documentation of git see the "Pro Git" book:
+http://git-scm.com/book
 
-Another online tutorial that has been recommended is:
-
-* http://wiki.spheredev.org/Git_for_the_lazy
+Another online tutorial that has been recommended is Git for the Lazy:
+http://wiki.spheredev.org/Git_for_the_lazy
 
 
 ==  Prepare your system for development with git
 
 ===  Install git on your system
 
-In the package manager, select the package "git-core" (the package
-"git" is an unrelated program; don't choose it).  Optionally, select
+git is packaged by all common distributions, including Ubuntu and Debian,
+so it is easy to install.
+
+Unfortunately the name "git" is used both by the revision control
+system that LinuxCNC uses, and by an older software package called
+"GNU Interactive Tools".  When you go to install git
+
+of the package changed sometime between ^h
+
+In the Ubuntu or Debian package manager, install the package "git-core"
+(on Lucid 10.04 and Hardy 8.04) or the package "git" (on Precise 12.04
+and newer).
+
+is an unrelated program; don't choose it).  Optionally, select
 "gitk" or "qgit" (not on Dapper) to graphically view project history,
 and "git-gui" to graphically select files to commit.
 
