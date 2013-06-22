@@ -11,8 +11,9 @@ http://article.gmane.org/gmane.linux.distributions.emc.user/15046
 This document describes how to use git with the LinuxCNC project.
 
 The intended audience is anyone who wants to access or modify the
-LinuxCNC source.  "Source" in this context means both the source code
-to the programs and libraries, and the source text for the documentation.
+LinuxCNC source.  "Source" in this context means anything we keep in
+git, which includes both the source code to the programs and libraries,
+and the source text for the documentation.
 
 
 == External git tutorials
@@ -21,36 +22,28 @@ Git is a very popular and very common revision control system, and there
 are many excellent, free git tutorials on the internet.
 
 The first place to look is probably the "gittutorial" manpage.
-This manpage is accessible by running "man gittutorial" in a
-terminal (if you have the git manpages installed), and online here:
-https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html
+This manpage is accessible by running "man gittutorial" in a terminal
+(if you have the git manpages installed).  The gittutorial and its
+follow-on documentation are available online here:
+
+* git tutorial:
+  https://www.kernel.org/pub/software/scm/git/docs/gittutorial.html
+
+* git tutorial 2:
+  https://www.kernel.org/pub/software/scm/git/docs/gittutorial-2.html
+
+* Everyday git with 20 commands or so:
+  https://www.kernel.org/pub/software/scm/git/docs/everyday.html
+
+* Git User's Manual:
+  https://www.kernel.org/pub/software/scm/git/docs/user-manual.html
 
 For a more thorough git manual, see the "Pro Git" book, available for
 free online here: http://git-scm.com/book
 
-Some other online tutorials that have been recommended are:
-
-* http://schacon.github.io/git/everyday.html
+Another online tutorial that has been recommended is:
 
 * http://wiki.spheredev.org/Git_for_the_lazy
-
-
-
-
-and full manpages for every git command (man git-clone or git --help
-clone)
-
-The below tips can feel very daunting; don't panic. Your day-to-day life
-with git is going to be very simple:
-
-git pull
-
-git commit -a
-
-git format-patch OR git push
-
-
-
 
 
 ==  Prepare your system for development with git
