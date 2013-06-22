@@ -54,24 +54,15 @@ so it is easy to install.
 
 Unfortunately the name "git" is used both by the revision control
 system that LinuxCNC uses, and by an older software package called
-"GNU Interactive Tools".  When you go to install git
+"GNU Interactive Tools".  When you go to install git, make sure you
+get the correct one!  In older versions of Ubuntu, including Hardy 8.04
+and Lucid 10.04, the git package is called "git-core", to avoid conflict
+with GNU Interactive Tools.  In newer versions of Ubuntu, including
+Precise 12.04, the git package is simply called "git".
 
-of the package changed sometime between ^h
+Also consider installing the git manpages, in the "git-man" or "git-doc"
+package, and the git GUI tools "git-gui" and "gitk".
 
-In the Ubuntu or Debian package manager, install the package "git-core"
-(on Lucid 10.04 and Hardy 8.04) or the package "git" (on Precise 12.04
-and newer).
-
-is an unrelated program; don't choose it).  Optionally, select
-"gitk" or "qgit" (not on Dapper) to graphically view project history,
-and "git-gui" to graphically select files to commit.
-
-If you're using Ubuntu Dapper, git 1.6 packages are available on
-the linuxcnc.org package server in the linuxcnc2.3 directory.  If you
-already have this repository enabled, simply update your package lists,
-and the new git packages will be available for installation.  (The git
-1.1 packages that shipped with dapper, and the git 1.5 packages in
-dapper-backports, are both not recommended for various reasons)
 
 ===  Configure your identity
 
