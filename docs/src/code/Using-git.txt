@@ -54,14 +54,14 @@ so it is easy to install.
 
 Unfortunately the name "git" is used both by the revision control
 system that LinuxCNC uses, and by an older software package called
-"GNU Interactive Tools".  When you go to install git, make sure you
-get the correct one!  In older versions of Ubuntu, including Hardy 8.04
-and Lucid 10.04, the git package is called "git-core", to avoid conflict
-with GNU Interactive Tools.  In newer versions of Ubuntu, including
-Precise 12.04, the git package is simply called "git".
+"GNU Interactive Tools".  When you install git, make sure you get the
+correct one!  In older versions of Ubuntu, including Hardy 8.04 and Lucid
+10.04, the git package is called "git-core", to avoid conflict with GNU
+Interactive Tools.  In newer versions of Ubuntu, including Precise 12.04,
+the git package is simply called "git".
 
 Also consider installing the git manpages, in the "git-man" or "git-doc"
-package, and the git GUI tools "git-gui" and "gitk".
+package, and the git GUI tools in the "git-gui" and "gitk" packages.
 
 
 ===  Configure your identity
@@ -72,31 +72,39 @@ package, and the git GUI tools "git-gui" and "gitk".
 
 Use your real name (not a handle), and use an unobfuscated e-mail address.
 
+
 ==  Create an initial check-out
 
 "clone" is the git command that gets a copy of a project's history.
 It is roughly like "cvs co", except that the whole project history
 (not just the current working files) are available after a clone.
 
-===  Anonymous checkouts
 
-git clone git://git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev
+===  Anonymous clones
 
-this will create a new local directory 'linuxcnc-dev' and fetch the
-full history of the project.  On a system with a 3 megabit connection,
-this took about 3 minutes and the created directory is about 80 megs.
+`git clone git://git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev`
+
+This will create a new local directory 'linuxcnc-dev' and fetch the full
+history of the project.  Anyone can do this to access the project source,
+no special priviledges or permissions are needed.
+
+On a system with a 3 megabit connection, this took about 3 minutes and
+the created directory is about 80 megs.
+
 The repo created by this clone command is a full repo: it has all of
 the history, and you can make local commits (for your own use, or for
 sending to developers with commit access to the central repo).  You can
 not push back to the central repo from this repo.
 
-===  Registered user checkouts
+
+===  Registered user clones
 
 If you are a registered developer with "push" access, use
 
-git clone ssh://developername@git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev
+`git clone ssh://developername@git.linuxcnc.org/git/linuxcnc.git linuxcnc-dev`
 
 This creates a repo that can push back to the central repo.
+
 
 ===  About your cloned local repo
 
@@ -105,33 +113,35 @@ directory called "linuxcnc-dev", containing a full clone of the
 linuxcnc.org git repo.  All the commands below assume that you are in
 the linuxcnc-dev directory unless noted otherwise.
 
+
 ==  View history
 
 Take a look at the history:
 
-git log -C --stat
+`git log -C --stat`
 
 (git log has a bunch of options; this set detects renames and copies,
 and shows a summary of what files are changed in each commit)
 
 Get a closer look at a particular change by commit:
 
-git log -C -p -1 57c609
+`git log -C -p -1 2036365561fed`
 
-(-p shows a patch, -1 restricts to a single change, and 57c609 is the
-start of a commit shown by the first 'git log' command)
+(-p shows a patch, -1 restricts to a single change, and 2036365561fed
+is the start of a commit shown by the first 'git log' command)
 
 Get a list of commits to a particular file since v2.1.7 branch:
 
-git log --oneline v2.1.7..origin/v2_3_branch --
-src/hal/components/stepgen.c
+`git log --oneline v2.1.7..origin/v2_3_branch -- src/hal/components/stepgen.c`
 
 View history graphically, if you installed the necessary program:
 
-gitk --all qgit --all
+`gitk --all`
 
-You can also [view the history online in gitweb], but viewing the history
-locally is often more powerful.
+You can also view the history online in gitweb, but viewing the
+history locally is often more powerful.  The linuxcnc gitweb URL is:
+http://git.linuxcnc.org/gitweb?p=linuxcnc.git;a=summary
+
 
 ==  Commit changes
 
