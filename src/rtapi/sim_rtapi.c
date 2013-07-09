@@ -39,6 +39,7 @@ struct rtapi_task {
   int prio;
   int period;
   int ratio;
+  int uses_fp;
   void *arg;
   void (*taskcode) (void*);	/* pointer to task function */
 };
@@ -140,6 +141,7 @@ int rtapi_task_new(void (*taskcode) (void*), void *arg,
   task->stacksize = stacksize;
   task->taskcode = taskcode;
   task->prio = prio;
+  task->uses_fp = uses_fp;
 
   /* and return handle to the caller */
 
@@ -163,6 +165,25 @@ int rtapi_task_delete(int id) {
   return 0;
 }
 
+#ifdef __i386__
+#include <execinfo.h>
+#include <fpu_control.h>
+void nofp_used_x87(int signum, siginfo_t *info, void *ptr)
+{
+#define BT_SIZE 100
+    void *buffer[BT_SIZE];
+    int nptrs;
+
+    rtapi_print_msg(RTAPI_MSG_ERR,
+	    "nofp task used fp instruction @%p\n", info->si_addr);
+
+    nptrs = backtrace(buffer, BT_SIZE);
+    backtrace_symbols_fd(buffer, nptrs, STDERR_FILENO);
+
+    rtapi_print_msg(RTAPI_MSG_ERR, "terminating rtapi_app\n");
+    abort();
+}
+#endif
 
 static void wrapper(void *arg)
 {
@@ -174,6 +195,28 @@ static void wrapper(void *arg)
   task->ratio = task->period / period;
   rtapi_print_msg(RTAPI_MSG_INFO, "task %p period = %d ratio=%d\n",
 	  task, task->period, task->ratio);
+
+#ifdef __i386__
+  if(!task->uses_fp)
+  {
+      unsigned short fpu_cw = _FPU_DEFAULT & ~_FPU_MASK_IM;
+      struct sigaction act;
+      memset(&act, 0, sizeof(act));
+      act.sa_sigaction = nofp_used_x87;
+      act.sa_flags = SA_SIGINFO;
+      sigaction(SIGFPE, &act, NULL);
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+      __asm__("fldz");
+
+      _FPU_SETCW(fpu_cw);
+  }
+#endif
 
   /* call the task function with the task argument */
   (task->taskcode) (task->arg);
