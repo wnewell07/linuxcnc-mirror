@@ -64,34 +64,6 @@
 #include <modbus-tcp.h>
 #include "inifile.h"
 
-/*
- * VFS-11 parameters:
- *
- * There are dozens of parameters. Some can be stored permanently in EEPROM (setup parameters),
- * some in RAM (operating paramters), and some can be stored both in EEPROM and RAM. The manual
- * is a bit unclear which parameters are RAM/EEPROM/both.
- *
- * There are two communication protocols to talk to the VF-S11, a proprietary but documented
- * "Toshiba Inverter Protocol" (TIP), and a simple Modbus subset. TIP can set EEPROM and RAM
- * parameters and hence can be used for initial inverter configuration. Modbus control can only
- * set operating paramters in RAM. So any setup parameters which you'd like to change (like,
- * e.g. maximum output frequency) need to be set up differently, either through the operating
- * panel, or through a Windows program supplied by Toshiba named PCS001Z.
- *
- * Before using this driver, you need at least change the communication protocol from
- * TIP (default) to Modbus either way.
- *
- * Note from   TOSVERT VF-S11 Communications Function  Instruction Manual:
- *
- * The EEPROM life is 10,000 operations.
- * Do not write in the same parameter that has an EEPROM more than 10,000 times.
- * The communication commands (FA00, FA20, FA26), communication frequency command (FA01),
- * terminal output data (FA50) and analog output data (FA50) are stored in the RAMs only and no re-
- * strictions are placed on them.
- *
- * NB: "analog output data (FA50)" is obviously a typo in the manual, it's really FA51
- */
-
 // command registers for DELTA VFD-B Inverter
 #define REG_COMMAND1                    0x2000  // "Communication command" - start/stop, fwd/reverse, DC break, fault reset, panel override
 #define REG_COMMAND2                    0xFA20
@@ -144,7 +116,7 @@
  * are contiguous and all of them can be read with a single read_holding_registers()
  * operation.
  *
- * However, the interesting VF-S11 registers are not contiguous, and must be read
+ * However, the interesting VFD-B registers are not contiguous, and must be read
  * one-by-one, because the Toshiba Modbus implementation only supports single-value
  * modbus_read_registers() queries, slowing things down considerably. It seems that
  * other VFD's have similar restrictions.
@@ -464,7 +436,7 @@ void usage(int argc, char **argv) {
             "-I or --ini <inifile>\n"
             "    Use <inifile> (default: take ini filename from environment variable INI_FILE_NAME)\n"
             "-S or --section <section-name> (default 8)\n"
-            "    Read parameters from <section_name> (default 'VFS11')\n"
+            "    Read parameters from <section_name> (default 'VFD-B')\n"
             "-d or --debug\n"
             "    Turn on debugging messages. Toggled by USR1 signal.\n"
             "-m or --modbus-debug\n"
