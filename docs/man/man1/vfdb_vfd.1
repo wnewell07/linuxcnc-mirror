@@ -36,7 +36,7 @@
 .SH DESCRIPTION
 This manual page explains the
 .B vfdb_vfd
-component. This component reads and writes to the vfdb via a Modbus connection.
+component. This component reads and writes to the VFD-B device via a Modbus connection.
 .PP
 \fBvfdb_vfd\fP is for use with LinuxCNC.
 
@@ -54,14 +54,52 @@ Also toggled by sending a USR2 signal to the vfdb_vfd process.
 .B
 .IP -I\ --ini\ <inifilename>
 take configuration from this ini
-file. Defaults to environment variable INI_FILE_NAME.
+file. Defaults to environment variable INI_FILE_NAME.  Most vfdb_vfd
+configuration comes from the ini file, noth from command-line arguments.
 .B
 .IP -S\ --section\ <section\ name>
 take configuration from this
-section in the ini file. Defaults to 'VFS11'.
+section in the ini file. Defaults to 'VFD-B'.
 .B
 .IP -r\ --report-device
 report device propertiers on console at startup
+
+.SH INI CONFIG VARIABLES
+Fixme: These ini config variables need to be documented better...
+.B
+.IP DEBUG
+.B
+.IP MODBUS_DEBUG
+.B
+.IP BITS
+.B
+.IP BAUD
+.B
+.IP STOPBITS
+.B
+.IP TARGET
+.B
+.IP POLLCYCLES
+.B
+.IP PORT
+.B
+.IP RECONNECT_DELAY
+.B
+.IP TCPDEST
+.B
+.IP DEVICE
+.B
+.IP RESPONSE_TIMEOUT
+.B
+.IP BYTE_TIMEOUT
+.B
+.IP PARITY
+.B
+.IP RTS_MODE
+.B
+.IP SERIAL_MODE
+.B
+.IP TYPE
 
 .SH PINS
 .B
@@ -116,10 +154,13 @@ to reboot the VFD and clear the e-stop status.
 true when the VFD reports 0 Hz output
 .B
 .IP <name>.jog-mode\ (bit,\ in)
-1 for ON and 0 for OFF, enables the VFD-B 'jog mode'. Speed control is disabled, and the output frequency is determined by register F262 (preset to 5Hz). This might be useful for spindle orientation.
+1 for ON and 0 for OFF, enables the VFD-B 'jog mode'. Speed control
+is disabled, and the output frequency is determined by register F262
+(preset to 5Hz). This might be useful for spindle orientation.
 .B
 .IP <name>.max-rpm\ (float,\ R)
-actual RPM limit based on maximum frequency the VFD may generate, and the motors nameplate values. For instance, if
+actual RPM limit based on maximum frequency the VFD may generate, and
+the motors nameplate values. For instance, if
 .I nameplate-HZ
 is 50, and
 .I nameplate-RPM_
