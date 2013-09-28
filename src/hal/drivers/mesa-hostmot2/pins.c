@@ -566,6 +566,8 @@ void hm2_configure_pins(hostmot2_t *hm2) {
     hm2_pins_allocate_all(hm2, HM2_GTAG_ENCODER, hm2->encoder.num_instances);
     // Abs encoders are all packed together, not necessarily contiguously
     hm2_pins_allocate_all(hm2, HM2_GTAG_SSI, MAX_ABSENCS);
+    hm2_pins_allocate_all(hm2, HM2_GTAG_BISS, MAX_ABSENCS);
+    hm2_pins_allocate_all(hm2, HM2_GTAG_FABS, MAX_ABSENCS);
     hm2_pins_allocate_all(hm2, HM2_GTAG_RESOLVER, hm2->resolver.num_instances);
     hm2_pins_allocate_all(hm2, HM2_GTAG_PWMGEN,  hm2->pwmgen.num_instances);
     hm2_pins_allocate_all(hm2, HM2_GTAG_TPPWM,  hm2->tp_pwmgen.num_instances);
@@ -577,6 +579,7 @@ void hm2_configure_pins(hostmot2_t *hm2) {
     hm2_pins_allocate_all(hm2, HM2_GTAG_MUXED_ENCODER_SEL, hm2->encoder.num_instances);
     // and about half as many I/Os as you'd expect
     hm2_pins_allocate_all(hm2, HM2_GTAG_MUXED_ENCODER, (hm2->encoder.num_instances+1)/2);
+    hm2_pins_allocate_all(hm2, HM2_GTAG_HM2DPLL, hm2->hm2dpll.num_instances);
 }
 
 
