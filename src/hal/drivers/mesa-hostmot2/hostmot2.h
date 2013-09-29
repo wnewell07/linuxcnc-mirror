@@ -123,9 +123,9 @@ char **argv_split(gfp_t gfp, const char *str, int *argcp);
 #define HM2_GTAG_DAQFIFO           (21) // Not supported
 #define HM2_GTAG_BINOSC            (22) // Not supported
 #define HM2_GTAG_DDMA              (23) // Not supported
-#define HM2_GTAG_BISS              (24) // Not supported
-#define HM2_GTAG_FABS              (25) // Not supported
-#define HM2_GTAG_HM2DPLL           (26) // Not supported
+#define HM2_GTAG_BISS              (24) 
+#define HM2_GTAG_FABS              (25) 
+#define HM2_GTAG_HM2DPLL           (26) 
 #define HM2_GTAG_LIOPORT           (64) // Not supported
 #define HM2_GTAG_LED               (128)
 
@@ -804,7 +804,7 @@ typedef struct {
     hal_float_t *time3_ms;
     hal_float_t *time4_ms;
     hal_float_t *base_freq;
-    hal_u32_t *phase_error;
+    hal_s32_t *phase_error;
     hal_u32_t *plimit;
     hal_u32_t *filter;
     hal_u32_t *ddssize;

@@ -266,6 +266,17 @@ static const char* hm2_get_pin_secondary_name(hm2_pin_t *pin) {
                 case 0x4: return "TestClk";
             }
             break;
+            
+        case HM2_GTAG_HM2DPLL:
+            switch (sec_pin) {
+                case 0x1: return "Sync In Pin";
+                case 0x2: return "Ref Out Pin";
+                case 0x3: return "Timer 1 Pin";
+                case 0x4: return "Timer 2 Pin";
+                case 0x5: return "Timer 3 Pin";
+                case 0x6: return "Timer 4 Pin";
+            }
+            break;
 
         case HM2_GTAG_TWIDDLER: // Not Supported Currently
              if (sec_pin < 0x20){

@@ -83,23 +83,23 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
             hm2->llio->comp_id, "%s.hm2dpll.04.timer-ms", hm2->llio->name);
     r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->base_freq),
             hm2->llio->comp_id, "%s.hm2dpll.base-freq-khz", hm2->llio->name);
-    r += hal_pin_u32_newf(HAL_OUT, &(hm2->hm2dpll.pins->phase_error),
+    r += hal_pin_s32_newf(HAL_OUT, &(hm2->hm2dpll.pins->phase_error),
             hm2->llio->comp_id, "%s.hm2dpll.phase-error", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->time_const),
             hm2->llio->comp_id, "%s.hm2dpll.time-const", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->plimit),
             hm2->llio->comp_id, "%s.hm2dpll.plimit", hm2->llio->name);
-    r += hal_pin_u32_newf(HAL_OUT, &(hm2->hm2dpll.pins->filter),
+    r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->filter),
             hm2->llio->comp_id, "%s.hm2dpll.filter", hm2->llio->name);
-    r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->ddssize),
+    r += hal_pin_u32_newf(HAL_OUT, &(hm2->hm2dpll.pins->ddssize),
             hm2->llio->comp_id, "%s.hm2dpll.ddsize", hm2->llio->name);
-    r += hal_pin_u32_newf(HAL_OUT, &(hm2->hm2dpll.pins->prescale),
+    r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->prescale),
             hm2->llio->comp_id, "%s.hm2dpll.prescale", hm2->llio->name);
     if (r < 0) {
         HM2_ERR("error adding hm2_dpll timer pins, Aborting\n");
         goto fail0;
     }
-    *hm2->hm2dpll.pins->prescale = 15;
+    *hm2->hm2dpll.pins->prescale = 1;
     *hm2->hm2dpll.pins->base_freq = -1; // An indication it needs init
 
     r = hm2_register_tram_write_region(hm2, hm2->hm2dpll.hm2_hm2dpll_sync_addr,
@@ -150,11 +150,13 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
     
     pins = hm2->hm2dpll.pins;
     
-    if (*pins->base_freq < 0 ) *pins->base_freq = 1000.0/period_ms;
+    if (*pins->base_freq < 0 ) {
+        *pins->base_freq = 1000.0/period_ms;
+    }
 
     if (*pins->prescale != 0){
-        buff = (u32)((*pins->base_freq * hm2->hm2dpll.clock_frequency * 1000000)  
-                / (( 1 << *pins->ddssize) * *pins->prescale));
+        buff = (u32)((*pins->base_freq * 1000.0 * (1LL << *pins->ddssize) 
+                / (hm2->hm2dpll.clock_frequency * *pins->prescale)));
     } else {
         buff = 0;
     }
@@ -164,7 +166,7 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.base_rate_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting base rate to %08x\n", buff);
+        HM2_PRINT("setting base rate to %08x. Clock frequency %i base-freq %i\n", buff, hm2->hm2dpll.clock_frequency, (u32)*hm2->hm2dpll.pins->base_freq);
         hm2->hm2dpll.base_rate_written= buff;
     }
     buff = (u32)(*pins->prescale << 24 
