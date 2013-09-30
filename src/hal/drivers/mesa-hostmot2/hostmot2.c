@@ -300,7 +300,7 @@ int hm2_fabs_parse(hostmot2_t *hm2, char *token, int gtag){
     }
     if (*token != '='){
         HM2_ERR("The absolute encoder tag must be in the form "
-                "[ssi / biss / fabs]_chan_N=abcdefg where N is a number"
+                "[ssi / biss / fanuc]_chan_N=abcdefg where N is a number"
                 " less than %i and abcdefg is a string specifying the "
                 "bit fields\n",
                 MAX_ABSENCS);
@@ -309,7 +309,7 @@ int hm2_fabs_parse(hostmot2_t *hm2, char *token, int gtag){
     list_for_each(ptr, &hm2->config.absenc_formats){
         def = list_entry(ptr, hm2_absenc_format_t, list);
         if (i == def->index && gtag == def->gtag){
-            HM2_ERR("Duplicate SSI/BISS/FABS definition. {Index %i for GTAG %i)"
+            HM2_ERR("Duplicate SSI/BISS/Fanuc definition. {Index %i for GTAG %i)"
                     "exiting\n", i, gtag);
             return -1;
         }

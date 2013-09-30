@@ -185,6 +185,7 @@ typedef struct {
     hal_s32_t s32_param;
     hal_float_t float_param;
     hal_u32_t timer_num;
+    hal_bit_t *error;
 }hm2_sserial_params_t;
 
 typedef struct {

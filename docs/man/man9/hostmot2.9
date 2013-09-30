@@ -294,6 +294,9 @@ before reporting the encoder stopped.  This parameter is in seconds.
 .SH Synchronous Serial Interface (SSI)
 (Not to be confused with the Smart Serial Interface)
 
+One pin is created for each SSI instance regardless of data format
+
+
 The names of the pins created by the SSI module will depend entirely on the 
 format string for each channel specified in the loadrt command line. 
 A typical format string might be
@@ -372,12 +375,16 @@ unsigned (u) data types.
  
 .TP
 Parameters:
-Only one parameter is universally created for all SSI instances
+Two parameters is universally created for all SSI instances
 
 .TP
 (float r/w) hm2_XiXX.N.ssi.MM.frequency-khz
 This parameter sets the SSI clock frequency. The units are kHz, so 500 will give
 a clock frequency of 500,000 Hz. 
+
+.TP 
+(u32 r/w) hm2_XiXX.N.ssi.MM.timer-num
+This parameter allocates the SSI module to a specific hm2dpll timer instance.
 
 Other parameters depend on the data types specified in the config string.
 .TP

@@ -799,10 +799,10 @@ typedef struct {
 //
 
 typedef struct {
-    hal_float_t *time1_ms;
-    hal_float_t *time2_ms;
-    hal_float_t *time3_ms;
-    hal_float_t *time4_ms;
+    hal_float_t *time1_us;
+    hal_float_t *time2_us;
+    hal_float_t *time3_us;
+    hal_float_t *time4_us;
     hal_float_t *base_freq;
     hal_s32_t *phase_error;
     hal_u32_t *plimit;

@@ -73,14 +73,14 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
     // export to HAL
     hm2->hm2dpll.pins = hal_malloc(sizeof(hm2_hm2dpll_pins_t));
 
-    r = hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time1_ms),
-            hm2->llio->comp_id, "%s.hm2dpll.01.timer-ms", hm2->llio->name);
-    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time2_ms),
-            hm2->llio->comp_id, "%s.hm2dpll.02.timer-ms", hm2->llio->name);
-    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time3_ms),
-            hm2->llio->comp_id, "%s.hm2dpll.03.timer-ms", hm2->llio->name);
-    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time4_ms),
-            hm2->llio->comp_id, "%s.hm2dpll.04.timer-ms", hm2->llio->name);
+    r = hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time1_us),
+            hm2->llio->comp_id, "%s.hm2dpll.01.timer-us", hm2->llio->name);
+    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time2_us),
+            hm2->llio->comp_id, "%s.hm2dpll.02.timer-us", hm2->llio->name);
+    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time3_us),
+            hm2->llio->comp_id, "%s.hm2dpll.03.timer-us", hm2->llio->name);
+    r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->time4_us),
+            hm2->llio->comp_id, "%s.hm2dpll.04.timer-us", hm2->llio->name);
     r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->base_freq),
             hm2->llio->comp_id, "%s.hm2dpll.base-freq-khz", hm2->llio->name);
     r += hal_pin_s32_newf(HAL_OUT, &(hm2->hm2dpll.pins->phase_error),
@@ -188,8 +188,8 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
         HM2_PRINT("setting control reg 1 to %08x\n", buff);
         hm2->hm2dpll.control_reg1_written= buff;
     }
-    buff = (u32)((*hm2->hm2dpll.pins->time2_ms / period_ms) * 0x10000) << 16
-         | (u32)((*hm2->hm2dpll.pins->time1_ms / period_ms) * 0x10000);
+    buff = (u32)((*hm2->hm2dpll.pins->time2_us / period_ms) * 0x10000) << 16
+         | (u32)((*hm2->hm2dpll.pins->time1_us / period_ms) * 0x10000);
     if (buff != hm2->hm2dpll.timer_12_written){
         hm2->llio->write(hm2->llio,
                 hm2->hm2dpll.timer_12_addr,
@@ -198,8 +198,8 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
         HM2_PRINT("setting timer01 to %08x\n", buff);
         hm2->hm2dpll.timer_12_written = buff;
     }
-    buff = (u32)((*hm2->hm2dpll.pins->time4_ms / period_ms) * 0x10000) << 16
-         | (u32)((*hm2->hm2dpll.pins->time3_ms / period_ms) * 0x10000);
+    buff = (u32)((*hm2->hm2dpll.pins->time4_us / period_ms) * 0x10000) << 16
+         | (u32)((*hm2->hm2dpll.pins->time3_us / period_ms) * 0x10000);
     if (buff != hm2->hm2dpll.timer_34_written){
         hm2->llio->write(hm2->llio,
                 hm2->hm2dpll.timer_34_addr,

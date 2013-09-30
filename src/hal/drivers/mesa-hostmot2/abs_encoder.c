@@ -384,6 +384,14 @@ int hm2_absenc_parse_md(hostmot2_t *hm2, int md_index) {
                 }
                 
                 // Set up the common pins
+                if (hal_pin_bit_newf(HAL_OUT, &(chan->params->error),
+                        hm2->llio->comp_id,"%s.data-incomplete",
+                        chan->name)){
+                    HM2_ERR("error adding %s over-run pin, aborting\n", 
+                            chan->name);
+                    return -EINVAL;
+                }
+                // And Params
                 if (hal_param_float_newf(HAL_RW, &(chan->params->float_param),
                         hm2->llio->comp_id,"%s.frequency-khz",
                         chan->name)){
@@ -392,7 +400,7 @@ int hm2_absenc_parse_md(hostmot2_t *hm2, int md_index) {
                     return -EINVAL;
                 }
                 if (hal_param_u32_newf(HAL_RW, &(chan->params->timer_num),
-                        hm2->llio->comp_id,"%s.params.timer-number",
+                        hm2->llio->comp_id,"%s.timer-number",
                         chan->name)){
                     HM2_ERR("error adding %s timer number param, aborting\n", 
                             chan->name);
@@ -457,7 +465,8 @@ void hm2_absenc_process_tram_read(hostmot2_t *hm2, long period) {
         switch (chan->myinst){
         case HM2_GTAG_SSI:
             // Check that the data is all in.
-            if (*chan->reg_cs_read & 0x80000000){
+            *chan->params->error = *chan->reg_cs_read & 0x800;
+            if (*chan->params->error){
                 if (err_count < 16){
                     err_count++;
                     HM2_ERR("Data transmission (SSI) not complete before %s "
@@ -475,7 +484,8 @@ void hm2_absenc_process_tram_read(hostmot2_t *hm2, long period) {
             break;
         case HM2_GTAG_BISS:
             // Check that the data is all in.
-            if (*hm2->absenc.biss_busy_flags & (1 << chan->index)){
+            *chan->params->error = *hm2->absenc.biss_busy_flags & (1 << chan->index);
+            if (*chan->params->error){
                 if (err_count < 16){
                     err_count++;
                     HM2_ERR("Data transmission (BiSS) not complete before %s "
@@ -493,7 +503,8 @@ void hm2_absenc_process_tram_read(hostmot2_t *hm2, long period) {
             break;
         case HM2_GTAG_FABS:
             // Check that the data is all in.
-            if (*chan->reg_2_read & 0x80000000){
+            *chan->params->error = *chan->reg_2_read & 0x800;
+            if (*chan->params->error){
                 if (err_count < 16){
                     err_count++;
                     HM2_ERR("Fanuc encoder channel %i cable fault\n"
