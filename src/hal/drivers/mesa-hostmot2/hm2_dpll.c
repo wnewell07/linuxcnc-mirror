@@ -63,7 +63,6 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
     hm2->hm2dpll.clock_frequency = md->clock_freq;
     
     hm2->hm2dpll.base_rate_addr = md->base_address + 0 * md->register_stride;
-    hm2->hm2dpll.phase_error_addr = md->base_address + 1 * md->register_stride;
     hm2->hm2dpll.control_reg0_addr = md->base_address + 2 * md->register_stride;
     hm2->hm2dpll.control_reg1_addr = md->base_address + 3 * md->register_stride;
     hm2->hm2dpll.timer_12_addr = md->base_address + 4 * md->register_stride;
@@ -84,13 +83,11 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
     r += hal_pin_float_newf(HAL_IN, &(hm2->hm2dpll.pins->base_freq),
             hm2->llio->comp_id, "%s.hm2dpll.base-freq-khz", hm2->llio->name);
     r += hal_pin_s32_newf(HAL_OUT, &(hm2->hm2dpll.pins->phase_error),
-            hm2->llio->comp_id, "%s.hm2dpll.phase-error", hm2->llio->name);
+            hm2->llio->comp_id, "%s.hm2dpll.phase-error-us", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->time_const),
             hm2->llio->comp_id, "%s.hm2dpll.time-const", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->plimit),
             hm2->llio->comp_id, "%s.hm2dpll.plimit", hm2->llio->name);
-    r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->filter),
-            hm2->llio->comp_id, "%s.hm2dpll.filter", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_OUT, &(hm2->hm2dpll.pins->ddssize),
             hm2->llio->comp_id, "%s.hm2dpll.ddsize", hm2->llio->name);
     r += hal_pin_u32_newf(HAL_IN, &(hm2->hm2dpll.pins->prescale),
@@ -99,10 +96,16 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
         HM2_ERR("error adding hm2_dpll timer pins, Aborting\n");
         goto fail0;
     }
+    *hm2->hm2dpll.pins->time1_us = 100.0;
+    *hm2->hm2dpll.pins->time2_us = 100.0;
+    *hm2->hm2dpll.pins->time3_us = 100.0;
+    *hm2->hm2dpll.pins->time4_us = 100.0;
     *hm2->hm2dpll.pins->prescale = 1;
     *hm2->hm2dpll.pins->base_freq = -1; // An indication it needs init
+    *hm2->hm2dpll.pins->time_const = 0xA000;
+    *hm2->hm2dpll.pins->plimit = 0x400000;
 
-    r = hm2_register_tram_write_region(hm2, hm2->hm2dpll.hm2_hm2dpll_sync_addr,
+    r = hm2_register_tram_read_region(hm2, hm2->hm2dpll.hm2_hm2dpll_sync_addr,
             sizeof(u32), &hm2->hm2dpll.hm2_hm2dpll_sync_reg);
     if (r < 0) {
         HM2_ERR("Error registering tram synch write. Aborting\n");
@@ -114,13 +117,6 @@ int hm2_hm2dpll_parse_md(hostmot2_t *hm2, int md_index) {
         HM2_ERR("Error registering hm2dpll control reg 1. Aborting\n");
         goto fail0;
     }
-    r = hm2_register_tram_read_region(hm2, hm2->hm2dpll.phase_error_addr,
-            sizeof(u32), &hm2->hm2dpll.phase_error_reg_read);
-    if (r < 0) {
-        HM2_ERR("Error registering hm2dpll phase error. Aborting\n");
-        goto fail0;
-    }
-
 
     return hm2->hm2dpll.num_instances;
 
@@ -136,9 +132,9 @@ void hm2_hm2dpll_process_tram_read(hostmot2_t *hm2, long period){
     
      pins = hm2->hm2dpll.pins;
     
-    *pins[0].phase_error = *hm2->hm2dpll.phase_error_reg_read;
+    *pins->phase_error = (s32)*hm2->hm2dpll.hm2_hm2dpll_sync_reg 
+            * (period / 4294967296000.00) ;
     *pins->ddssize = *hm2->hm2dpll.control_reg1_read & 0xFF;
-    *pins->phase_error = *hm2->hm2dpll.phase_error_reg_read;
 }
 
 void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
@@ -166,7 +162,6 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.base_rate_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting base rate to %08x. Clock frequency %i base-freq %i\n", buff, hm2->hm2dpll.clock_frequency, (u32)*hm2->hm2dpll.pins->base_freq);
         hm2->hm2dpll.base_rate_written= buff;
     }
     buff = (u32)(*pins->prescale << 24 
@@ -176,7 +171,6 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.control_reg0_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting ctrl reg 0 to %08x\n", buff);
         hm2->hm2dpll.control_reg0_written= buff;
     }
     buff = (u32)(*pins->time_const << 16);
@@ -185,7 +179,6 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.control_reg1_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting control reg 1 to %08x\n", buff);
         hm2->hm2dpll.control_reg1_written= buff;
     }
     buff = (u32)((*hm2->hm2dpll.pins->time2_us / period_ms) * 0x10000) << 16
@@ -195,7 +188,6 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.timer_12_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting timer01 to %08x\n", buff);
         hm2->hm2dpll.timer_12_written = buff;
     }
     buff = (u32)((*hm2->hm2dpll.pins->time4_us / period_ms) * 0x10000) << 16
@@ -205,7 +197,6 @@ void hm2_hm2dpll_write(hostmot2_t *hm2, long period) {
                 hm2->hm2dpll.timer_34_addr,
                 &buff,
                 sizeof(u32));
-        HM2_PRINT("setting timer23 to %08x\n", buff);
         hm2->hm2dpll.timer_34_written = buff;
     }
 }

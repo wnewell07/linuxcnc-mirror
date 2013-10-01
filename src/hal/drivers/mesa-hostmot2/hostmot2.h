@@ -806,7 +806,6 @@ typedef struct {
     hal_float_t *base_freq;
     hal_s32_t *phase_error;
     hal_u32_t *plimit;
-    hal_u32_t *filter;
     hal_u32_t *ddssize;
     hal_u32_t *time_const;
     hal_u32_t *prescale;
@@ -819,8 +818,6 @@ typedef struct {
 
     u32 base_rate_addr;
     u32 base_rate_written;
-    u32 phase_error_addr;
-    u32 *phase_error_reg_read;
     u32 control_reg0_addr;
     u32 control_reg0_written;
     u32 control_reg1_addr;
