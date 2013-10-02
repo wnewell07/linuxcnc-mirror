@@ -607,7 +607,7 @@ void hm2_absenc_write(hostmot2_t *hm2){
                         chan->reg_2_addr,
                         &buff,
                         sizeof(u32));
-                chan->data3_written = buff2;
+                chan->data3_written = buff3;
             }
             break;
         default:
