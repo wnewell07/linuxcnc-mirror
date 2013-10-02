@@ -200,7 +200,7 @@ int hm2_absenc_setup_fabs(hostmot2_t *hm2, hm2_sserial_remote_t *chan,
 
 
 int hm2_absenc_parse_format(hm2_sserial_remote_t *chan,  hm2_absenc_format_t *def){
-    char* AA64 = "p%5pbatt%1bp%2pvalid%1bp%9plow%20lp%2pencoder%16hp%2pcomm%10up%3pcrc%5u";
+    char* AA64 = "%5pbatt_faill%1b%2ppos_invalid%1b%9plow%16l%2pencoder%16h%2pcomm%10u%7pcrc%5u";
     char* format = def->string;
     char name[HM2_SSERIAL_MAX_STRING_LENGTH+1] = "";
     
@@ -209,7 +209,7 @@ int hm2_absenc_parse_format(hm2_sserial_remote_t *chan,  hm2_absenc_format_t *de
     }
     
     while(*format){
-        if (*format == '%' && *name){
+        if (*format == '%'){
             int q = simple_strtol(++format, &format, 0);
             if (q == 0){
                 HM2_ERR_NO_LL("Invalid field length specification, you may "
@@ -502,24 +502,23 @@ void hm2_absenc_process_tram_read(hostmot2_t *hm2, long period) {
             }
             break;
         case HM2_GTAG_FABS:
-            // Check that the data is all in.
-            *chan->params->error = *chan->reg_2_read & 0x800;
-            if (*chan->params->error){
-                if (err_count < 16){
-                    err_count++;
-                    HM2_ERR("Fanuc encoder channel %i cable fault\n"
-                            "(warning %i of 16)\n", chan->index, err_count);
-                }
-                else if ((*chan->reg_cs_read & 0x800) && err_count < 16){
-                    err_count++;
-                    HM2_ERR("Data transmission (Fanuc) not complete before %s "
-                            "read\nYou may need to change the timing of the %s "
-                            "(warning %i of 16)\n",
-                            chan->name, 
-                            chan->params->timer_num ? "hm2_dpll":"absenc_trigger_function",
-                                    err_count);
-                }
+            // Check for errors
+            if (*chan->reg_2_read & 0x80000000 && err_count < 16){
+                err_count++;
+                HM2_ERR("Fanuc encoder channel %i cable fault\n"
+                        "(warning %i of 16)\n", chan->index, err_count);
             }
+            *chan->params->error = *chan->reg_cs_read & 0x800;
+            if (*chan->params->error && err_count < 16){
+                err_count++;
+                HM2_ERR("Data transmission (Fanuc) not complete before %s "
+                        "read\nYou may need to change the timing of the %s "
+                        "(warning %i of 16)\n",
+                        chan->name, 
+                        chan->params->timer_num ? "hm2_dpll":"absenc_trigger_function",
+                                err_count);
+            }
+
             else
             {
                 hm2_sserial_read_pins(chan);
@@ -579,13 +578,12 @@ void hm2_absenc_write(hostmot2_t *hm2){
             buff3 = chan->num_read_bits << 24
                     | (u32)(8.0e-6 * hm2->absenc.clock_frequency) << 14;
             buff2 = chan->params->u32_param << 28
-                    | ((u32)(0x10000 * (chan->params->float_param * 1000
+                    | ((u32)(0x100000 * (chan->params->float_param * 1000
                     / hm2->absenc.clock_frequency)));
             buff =  chan->params->timer_num << 12
                     | (chan->params->timer_num == 0) << 8
                     | (chan->params->timer_num != 0) << 9
-                    | (buff3 != chan->data3_written || buff2 != chan->data2_written) << 7
-                    | chan->num_read_bits;
+                    | (buff3 != chan->data3_written || buff2 != chan->data2_written) << 7;
             if (buff != chan->data_written){
                 // if necessary this will set the write flag, then next time through
                 // it will get cleared. 
@@ -593,6 +591,7 @@ void hm2_absenc_write(hostmot2_t *hm2){
                         chan->reg_cs_addr,
                         &buff,
                         sizeof(u32));
+                HM2_PRINT("Writing 0x%08X to 0x%04X\n", buff, chan->reg_cs_addr);
                 chan->data_written = buff;
             }
             if (buff2 != chan->data2_written){
@@ -600,6 +599,7 @@ void hm2_absenc_write(hostmot2_t *hm2){
                         chan->data_reg_addr,
                         &buff,
                         sizeof(u32));
+                HM2_PRINT("Writing 0x%08X to 0x%04X\n", buff2, chan->data_reg_addr);
                 chan->data2_written = buff2;
             }
             if (buff3 != chan->data3_written){
@@ -607,6 +607,7 @@ void hm2_absenc_write(hostmot2_t *hm2){
                         chan->reg_2_addr,
                         &buff,
                         sizeof(u32));
+                HM2_PRINT("Writing 0x%08X to 0x%04X\n", buff3, chan->reg_2_addr);
                 chan->data3_written = buff3;
             }
             break;
