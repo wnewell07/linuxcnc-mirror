@@ -575,24 +575,38 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 }
 
 void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
-    double discr, maxnewvel, newvel, newaccel=0;
+    double discr, maxnewvel, newvel, newaccel=0, delta_pos;
+    double discr_term1, discr_term2, discr_term3;
+    double v_f=0.0; // FIXME Dummy value for now 
+
     if(!tc->blending) tc->vel_at_blend_start = tc->currentvel;
 
-    discr = 0.5 * tc->cycle_time * tc->currentvel - (tc->target - tc->progress);
-    if(discr > 0.0) {
-        // should never happen: means we've overshot the target
+    delta_pos = tc->target - tc->progress;
+
+    // Descriminant is a little more complicated with final velocity term
+    discr_term1 = pmSq(v_f);
+    discr_term2 = tc->maxaccel * (2.0 * delta_pos - tc->currentvel * tc->cycle_time);
+    discr_term3 = pmSq(tc->maxaccel * tc->cycle_time / 2.0);
+
+    discr = discr_term1 + discr_term2 + discr_term3;
+
+    if(discr < 0.0) {
+        // FIXME - This means we've overshot the target, but with a non-zero
+        // final velocity, it's almost guaranteed to happen.
         newvel = maxnewvel = 0.0;
-    } else {
-        discr = 0.25 * pmSq(tc->cycle_time) - 2.0 / tc->maxaccel * discr;
-        newvel = maxnewvel = -0.5 * tc->maxaccel * tc->cycle_time + 
-            tc->maxaccel * pmSqrt(discr);
+    } 
+    else {
+        newvel = maxnewvel = -0.5 * tc->maxaccel * tc->cycle_time + pmSqrt(discr);
     }
+
     if(newvel <= 0.0) {
         // also should never happen - if we already finished this tc, it was
         // caught above
         newvel = newaccel = 0.0;
+        // ROB possible trouble spot 
         tc->progress = tc->target;
-    } else {
+    } 
+    else {
         // constrain velocity
         if(newvel > tc->reqvel * tc->feed_override) 
             newvel = tc->reqvel * tc->feed_override;
@@ -613,12 +627,11 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         // constrain acceleration and get resulting velocity
         if(newaccel > 0.0 && newaccel > tc->maxaccel) {
             newaccel = tc->maxaccel;
-            newvel = tc->currentvel + newaccel * tc->cycle_time;
         }
         if(newaccel < 0.0 && newaccel < -tc->maxaccel) {
             newaccel = -tc->maxaccel;
-            newvel = tc->currentvel + newaccel * tc->cycle_time;
         }
+        newvel = tc->currentvel + newaccel * tc->cycle_time;
         // update position in this tc
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
     }
