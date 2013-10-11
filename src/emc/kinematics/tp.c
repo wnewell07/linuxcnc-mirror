@@ -31,18 +31,18 @@ syncdio_t syncdio; //record tpSetDout's here
 int tpCreate(TP_STRUCT * tp, int _queueSize, TC_STRUCT * tcSpace)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     if (_queueSize <= 0) {
-	tp->queueSize = TP_DEFAULT_QUEUE_SIZE;
+        tp->queueSize = TP_DEFAULT_QUEUE_SIZE;
     } else {
-	tp->queueSize = _queueSize;
+        tp->queueSize = _queueSize;
     }
 
     /* create the queue */
     if (-1 == tcqCreate(&tp->queue, tp->queueSize, tcSpace)) {
-	return -1;
+        return -1;
     }
 
     /* init the rest of our data */
@@ -60,23 +60,23 @@ int tpClearDIOs() {
     syncdio.dio_mask = 0;
     syncdio.aio_mask = 0;
     for (i = 0; i < num_dio; i++)
-	syncdio.dios[i] = 0;
+        syncdio.dios[i] = 0;
     for (i = 0; i < num_aio; i++)
-	syncdio.aios[i] = 0;
+        syncdio.aios[i] = 0;
 
     return 0;
 }
 
 
 /*
-  tpClear() is a "soft init" in the sense that the TP_STRUCT configuration
-  parameters (cycleTime, vMax, and aMax) are left alone, but the queue is
-  cleared, and the flags are set to an empty, ready queue. The currentPos
-  is left alone, and goalPos is set to this position.
+   tpClear() is a "soft init" in the sense that the TP_STRUCT configuration
+   parameters (cycleTime, vMax, and aMax) are left alone, but the queue is
+   cleared, and the flags are set to an empty, ready queue. The currentPos
+   is left alone, and goalPos is set to this position.
 
-  This function is intended to put the motion queue in the state it would
-  be if all queued motions finished at the current position.
- */
+   This function is intended to put the motion queue in the state it would
+   be if all queued motions finished at the current position.
+   */
 int tpClear(TP_STRUCT * tp)
 {
     tcqInit(&tp->queue);
@@ -117,14 +117,14 @@ int tpInit(TP_STRUCT * tp)
     tp->wDotMax = 0.0;
 
     ZERO_EMC_POSE(tp->currentPos);
-    
+
     return tpClear(tp);
 }
 
 int tpSetCycleTime(TP_STRUCT * tp, double secs)
 {
     if (0 == tp || secs <= 0.0) {
-	return -1;
+        return -1;
     }
 
     tp->cycleTime = secs;
@@ -143,7 +143,7 @@ int tpSetCycleTime(TP_STRUCT * tp, double secs)
 int tpSetVmax(TP_STRUCT * tp, double vMax, double ini_maxvel)
 {
     if (0 == tp || vMax <= 0.0 || ini_maxvel <= 0.0) {
-	return -1;
+        return -1;
     }
 
     tp->vMax = vMax;
@@ -169,12 +169,12 @@ int tpSetVlimit(TP_STRUCT * tp, double vLimit)
     return 0;
 }
 
-// Set max accel
 
+/** Sets the max acceleration for the trajectory planner. */
 int tpSetAmax(TP_STRUCT * tp, double aMax)
 {
     if (0 == tp || aMax <= 0.0) {
-	return -1;
+        return -1;
     }
 
     tp->aMax = aMax;
@@ -182,23 +182,23 @@ int tpSetAmax(TP_STRUCT * tp, double aMax)
     return 0;
 }
 
-/*
-  tpSetId() sets the id that will be used for the next appended motions.
-  nextId is incremented so that the next time a motion is appended its id
-  will be one more than the previous one, modulo a signed int. If
-  you want your own ids for each motion, call this before each motion
-  you append and stick what you want in here.
-  */
+/**
+ * Sets the id that will be used for the next appended motions.  
+ * nextId is incremented so that the next time a motion is appended its id will
+ * be one more than the previous one, modulo a signed int. If you want your own
+ * ids for each motion, call this before each motion you append and stick what
+ * you want in here.
+ */
 int tpSetId(TP_STRUCT * tp, int id)
 {
 
     if (!MOTION_ID_VALID(id)) {
-	rtapi_print_msg(RTAPI_MSG_ERR, "tpSetId: invalid motion id %d\n", id);
-	return -1;
+        rtapi_print_msg(RTAPI_MSG_ERR, "tpSetId: invalid motion id %d\n", id);
+        return -1;
     }
-	
+
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     tp->nextId = id;
@@ -206,29 +206,27 @@ int tpSetId(TP_STRUCT * tp, int id)
     return 0;
 }
 
-/*
-  tpGetExecId() returns the id of the last motion that is currently
-  executing.
-  */
+/** Returns the id of the last motion that is currently
+  executing.*/
 int tpGetExecId(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     return tp->execId;
 }
 
-/*
-  tpSetTermCond(tp, cond) sets the termination condition for all subsequent
-  queued moves. If cond is TC_TERM_STOP, motion comes to a stop before
-  a subsequent move begins. If cond is TC_TERM_BLEND, the following move
-  is begun when the current move decelerates.
-  */
+/**
+ * Sets the termination condition for all subsequent queued moves. 
+ * If cond is TC_TERM_STOP, motion comes to a stop before a subsequent move
+ * begins. If cond is TC_TERM_BLEND, the following move is begun when the
+ * current move decelerates.
+ */
 int tpSetTermCond(TP_STRUCT * tp, int cond, double tolerance)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     if (cond != TC_TERM_COND_STOP && cond != TC_TERM_COND_BLEND) {
@@ -241,10 +239,11 @@ int tpSetTermCond(TP_STRUCT * tp, int cond, double tolerance)
     return 0;
 }
 
-// Used to tell the tp the initial position.  It sets
-// the current position AND the goal position to be the same.  
-// Used only at TP initialization and when switching modes.
-
+/**
+ * Used to tell the tp the initial position. 
+ * It sets the current position AND the goal position to be the same.  Used
+ * only at TP initialization and when switching modes.
+ */
 int tpSetPos(TP_STRUCT * tp, EmcPose pos)
 {
     if (0 == tp) {
@@ -257,6 +256,9 @@ int tpSetPos(TP_STRUCT * tp, EmcPose pos)
     return 0;
 }
 
+/**
+ * Adds a rigid tap cycle to the motion queue.
+ */
 int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel, 
                   double acc, unsigned char enables) {
     TC_STRUCT tc;
@@ -354,11 +356,13 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     return 0;
 }
 
-// Add a straight line to the tc queue.  This is a coordinated
-// move in any or all of the six axes.  it goes from the end
-// of the previous move to the new end specified here at the
-// currently-active accel and vel settings from the tp struct.
 
+/**
+ * Add a straight line to the tc queue.
+ * This is a coordinated move in any or all of the six axes. It goes from the
+ * end of the previous move to the new end specified here at the
+ * currently-active accel and vel settings from the tp struct.
+ */
 int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxvel, double acc, unsigned char enables, char atspeed, int indexrotary)
 {
     TC_STRUCT tc;
@@ -465,14 +469,16 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     return 0;
 }
 
-// likewise, this adds a circular (circle, arc, helix) move from
-// the end of the last move to this new position.  end is the
-// xyzabc of the destination, center/normal/turn specify the arc
-// in a way that makes sense to pmCircleInit (we don't care about
-// the details here.)  Note that degenerate arcs/circles are not
-// allowed; we are guaranteed to have a move in xyz so target is
-// always the circle/arc/helical length.
-
+/**
+ * Adds a circular (circle, arc, helix) move from the end of the
+ * last move to this new position.
+ *  
+ * @param end is the xyz/abc point of the destination.
+ *
+ * see pmCircleInit for further details on how arcs are specified. Note that
+ * degenerate arcs/circles are not allowed. We are guaranteed to have a move in
+ * xyz so the target is always the circle/arc/helical length.  
+ */
 int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 		PmCartesian center, PmCartesian normal, int turn, int type,
                 double vel, double ini_maxvel, double acc, unsigned char enables, char atspeed)
@@ -574,6 +580,16 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     return 0;
 }
 
+/**
+ * Compute the updated position and velocity over one timestep.
+ * @param tc trajectory component being processed
+ * @param v optional velocity output as reference
+ * @param on_final_decel optional output flag indicating we are slowing towards the goal speed.
+ *
+ * This function creates the trapezoidal velocity profile based on tc's
+ * velocity and acceleration limits. The formula has been tweaked slightly to
+ * allow a non-zero velocity at the instant the target is reached.
+ */
 void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     double discr, maxnewvel, newvel, newaccel=0, delta_pos;
     double discr_term1, discr_term2, discr_term3;
@@ -600,8 +616,15 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     }
 
     if(newvel <= 0.0) {
-        // also should never happen - if we already finished this tc, it was
-        // caught above
+        //TODO deal with v_f here
+
+        // If we require a negative velocity, this means that at current
+        // conditions the move will end in between this timestep and the next.
+        //
+        // What we essentially do is shortcut the intergration and just make
+        // our position at this timestep be at the goal. I suspect this has the
+        // effect of momentarily increasing the effective acceleration by up to
+        // double nominal value.
         newvel = newaccel = 0.0;
         // ROB possible trouble spot 
         tc->progress = tc->target;
@@ -640,7 +663,6 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     if(on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
 }
 
-
 void tpToggleDIOs(TC_STRUCT * tc) {
     int i=0;
     if (tc->syncdio.anychanged != 0) { // we have DIO's to turn on or off
@@ -657,6 +679,7 @@ void tpToggleDIOs(TC_STRUCT * tc) {
     }
 }
 
+//TODO document
 static void tpSetRotaryUnlock(int axis, int unlock) {
     emcmotSetRotaryUnlock(axis, unlock);
 }
