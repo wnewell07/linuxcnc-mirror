@@ -689,36 +689,31 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         // effect of momentarily increasing the effective acceleration by up to
         // double nominal value.
         newvel = newaccel = 0.0;
-        // ROB possible trouble spot 
         tc->progress = tc->target;
     } 
     else {
         // constrain velocity
-        if(newvel > tc->reqvel * tc->feed_override) 
-            newvel = tc->reqvel * tc->feed_override;
+        double req_vel = tc->reqvel * tc->feed_override;
+        if(newvel > req_vel)    newvel = req_vel;
         if(newvel > tc->maxvel) newvel = tc->maxvel;
 
-        // if the motion is not purely rotary axes (and therefore in angular units) ...
-        if(!(tc->motion_type == TC_LINEAR && tc->coords.line.xyz.tmag_zero && tc->coords.line.uvw.tmag_zero)) {
-            // ... clamp motion's velocity at TRAJ MAX_VELOCITY (tooltip maxvel)
-            // except when it's synced to spindle position.
-            if((!tc->synchronized || tc->velocity_mode) && newvel > tp->vLimit) {
-                newvel = tp->vLimit;
-            }
+        bool is_pure_rotary = (tc->motion_type == TC_LINEAR) &&
+            (tc->coords.line.xyz.tmag_zero) && (tc->coords.line.uvw.tmag_zero);
+        bool is_position_synced = (!tc->synchronized) || tc->velocity_mode;
+
+        // if the motion is not purely rotary axes (and therefore in angular
+        // units), clamp motion's velocity at TRAJ MAX_VELOCITY (tooltip
+        // maxvel) except when it's synced to spindle position.
+        if(!is_pure_rotary && !is_position_synced && newvel > tp->vLimit) {
+            newvel = tp->vLimit;
         }
 
-        // get resulting acceleration
+        // get acceleration to reach newvel, bounded by machine maximum
         newaccel = (newvel - tc->currentvel) / tc->cycle_time;
-        
-        // constrain acceleration and get resulting velocity
-        if(newaccel > 0.0 && newaccel > tc->maxaccel) {
-            newaccel = tc->maxaccel;
-        }
-        if(newaccel < 0.0 && newaccel < -tc->maxaccel) {
-            newaccel = -tc->maxaccel;
-        }
+        newaccel = saturate(newaccel,tc->maxaccel);
+
         newvel = tc->currentvel + newaccel * tc->cycle_time;
-        // update position in this tc
+        // update position in this tc using trapezoidal integration
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
     }
     tc->currentvel = newvel;
