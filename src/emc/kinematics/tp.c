@@ -580,6 +580,69 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     return 0;
 }
 
+
+/**
+ * Adjusts blend velocity and acceleration to safe limits.
+ * If we are blending between tc and nexttc, then we need to figure out what a
+ * safe blend velocity is based on the known trajectory parameters. This
+ * function updates the TC_STRUCT data with a safe blend velocity.
+ */
+void tcComputeBlendParameters(TC_STRUCT* tc, TC_STRUCT* nexttc) {
+
+    if(nexttc && nexttc->maxaccel) {
+        tc->blend_vel = nexttc->maxaccel * 
+            pmSqrt(nexttc->target / nexttc->maxaccel);
+        if(tc->blend_vel > nexttc->reqvel * nexttc->feed_override) {
+            // segment has a cruise phase so let's blend over the 
+            // whole accel period if possible
+            tc->blend_vel = nexttc->reqvel * nexttc->feed_override;
+        }
+        if(tc->maxaccel < nexttc->maxaccel)
+            tc->blend_vel *= tc->maxaccel/nexttc->maxaccel;
+
+        if(tc->tolerance) {
+            /* see diagram blend.fig.  T (blend tolerance) is given, theta
+             * is calculated from dot(s1,s2)
+             *
+             * blend criteria: we are decelerating at the end of segment s1
+             * and we pass distance d from the end.  
+             * find the corresponding velocity v when passing d.
+             *
+             * in the drawing note d = 2T/cos(theta)
+             *
+             * when v1 is decelerating at a to stop, v = at, t = v/a
+             * so required d = .5 a (v/a)^2
+             *
+             * equate the two expressions for d and solve for v
+             */
+            double tblend_vel;
+            double dot;
+            double theta;
+            PmCartesian v1, v2;
+
+            v1 = tcGetEndingUnitVector(tc);
+            v2 = tcGetStartingUnitVector(nexttc);
+            pmCartCartDot(v1, v2, &dot);
+
+            theta = acos(-dot)/2.0; 
+            if(cos(theta) > 0.001) {
+                tblend_vel = 2.0 * pmSqrt(tc->maxaccel * tc->tolerance / cos(theta));
+                if(tblend_vel < tc->blend_vel)
+                    tc->blend_vel = tblend_vel;
+            }
+        }
+    }
+}
+
+/**
+ * Clip (saturate) a value x to be within +/- max.
+ */
+inline double saturate(double x, double max) {
+    if ( x > max ) return max;
+    else if ( x < (-max) ) return -max;
+    else return x;
+}
+
 /**
  * Compute the updated position and velocity over one timestep.
  * @param tc trajectory component being processed
@@ -1055,53 +1118,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 	    nexttc->feed_override = 0.0;
 	}
     }
-
-    // calculate the approximate peak velocity the nexttc will hit.
-    // we know to start blending it in when the current tc goes below
-    // this velocity...
-    if(nexttc && nexttc->maxaccel) {
-        tc->blend_vel = nexttc->maxaccel * 
-            pmSqrt(nexttc->target / nexttc->maxaccel);
-        if(tc->blend_vel > nexttc->reqvel * nexttc->feed_override) {
-            // segment has a cruise phase so let's blend over the 
-            // whole accel period if possible
-            tc->blend_vel = nexttc->reqvel * nexttc->feed_override;
-        }
-        if(tc->maxaccel < nexttc->maxaccel)
-            tc->blend_vel *= tc->maxaccel/nexttc->maxaccel;
-
-        if(tc->tolerance) {
-            /* see diagram blend.fig.  T (blend tolerance) is given, theta
-             * is calculated from dot(s1,s2)
-             *
-             * blend criteria: we are decelerating at the end of segment s1
-             * and we pass distance d from the end.  
-             * find the corresponding velocity v when passing d.
-             *
-             * in the drawing note d = 2T/cos(theta)
-             *
-             * when v1 is decelerating at a to stop, v = at, t = v/a
-             * so required d = .5 a (v/a)^2
-             *
-             * equate the two expressions for d and solve for v
-             */
-            double tblend_vel;
-            double dot;
-            double theta;
-            PmCartesian v1, v2;
-
-            v1 = tcGetEndingUnitVector(tc);
-            v2 = tcGetStartingUnitVector(nexttc);
-            pmCartCartDot(v1, v2, &dot);
-
-            theta = acos(-dot)/2.0; 
-            if(cos(theta) > 0.001) {
-                tblend_vel = 2.0 * pmSqrt(tc->maxaccel * tc->tolerance / cos(theta));
-                if(tblend_vel < tc->blend_vel)
-                    tc->blend_vel = tblend_vel;
-            }
-        }
-    }
+    
+    tcComputeBlendParameters(tc, nexttc);
 
     primary_before = tcGetPos(tc);
     tcRunCycle(tp, tc, &primary_vel, &on_final_decel);
