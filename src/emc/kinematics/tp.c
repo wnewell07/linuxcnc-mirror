@@ -28,6 +28,9 @@ extern emcmot_debug_t *emcmotDebug;
 int output_chan = 0;
 syncdio_t syncdio; //record tpSetDout's here
 
+/**
+ * Create the trajectory planner structure with an empty queue.
+ */
 int tpCreate(TP_STRUCT * tp, int _queueSize, TC_STRUCT * tcSpace)
 {
     if (0 == tp) {
@@ -49,10 +52,11 @@ int tpCreate(TP_STRUCT * tp, int _queueSize, TC_STRUCT * tcSpace)
     return tpInit(tp);
 }
 
-
-// this clears any potential DIO toggles
-// anychanged signals if any DIOs need to be changed
-// dios[i] = 1, DIO needs to get turned on, -1 = off
+/**
+ * Clears any potential DIO toggles and anychanged.
+ * If any DIOs need to be changed: dios[i] = 1, DIO needs to get turned on, -1
+ * = off
+ */
 int tpClearDIOs() {
     //XXX: All IO's will be flushed on next synced aio/dio! Is it ok?
     int i;
@@ -67,16 +71,15 @@ int tpClearDIOs() {
     return 0;
 }
 
-
-/*
-   tpClear() is a "soft init" in the sense that the TP_STRUCT configuration
-   parameters (cycleTime, vMax, and aMax) are left alone, but the queue is
-   cleared, and the flags are set to an empty, ready queue. The currentPos
-   is left alone, and goalPos is set to this position.
-
-   This function is intended to put the motion queue in the state it would
-   be if all queued motions finished at the current position.
-   */
+/**
+ *    "Soft initialize" the trajectory planner tp.
+ *    This is a "soft" initialization in that TP_STRUCT configuration
+ *    parameters (cycleTime, vMax, and aMax) are left alone, but the queue is
+ *    cleared, and the flags are set to an empty, ready queue. The currentPos
+ *    is left alone, and goalPos is set to this position.  This function is
+ *    intended to put the motion queue in the state it would be if all queued
+ *    motions finished at the current position.
+ */
 int tpClear(TP_STRUCT * tp)
 {
     tcqInit(&tp->queue);
@@ -104,7 +107,11 @@ int tpClear(TP_STRUCT * tp)
     return tpClearDIOs();
 }
 
-
+/**
+ * Fully initialize the tp structure.
+ * Sets tp configuration to default values and calls tpClear to create a fresh,
+ * empty queue.
+ */
 int tpInit(TP_STRUCT * tp)
 {
     tp->cycleTime = 0.0;
@@ -121,6 +128,9 @@ int tpInit(TP_STRUCT * tp)
     return tpClear(tp);
 }
 
+/**
+ * Set the cycle time for the trajectory planner.
+ */
 int tpSetCycleTime(TP_STRUCT * tp, double secs)
 {
     if (0 == tp || secs <= 0.0) {
@@ -132,14 +142,14 @@ int tpSetCycleTime(TP_STRUCT * tp, double secs)
     return 0;
 }
 
-// This is called before adding lines or circles, specifying
-// vMax (the velocity requested by the F word) and
-// ini_maxvel, the max velocity possible before meeting
-// a machine constraint caused by an AXIS's max velocity.
-// (the TP is allowed to go up to this high when feed 
-// override >100% is requested)  These settings apply to
-// subsequent moves until changed.
-
+/**
+ * Set requested velocity and absolute maximum velocity (bounded by machine).
+ * This is called before adding lines or circles, specifying vMax (the velocity
+ * requested by the F word) and ini_maxvel, the max velocity possible before
+ * meeting a machine constraint caused by an AXIS's max velocity.  (the TP is
+ * allowed to go up to this high when feed override >100% is requested)  These
+ * settings apply to subsequent moves until changed.
+ */
 int tpSetVmax(TP_STRUCT * tp, double vMax, double ini_maxvel)
 {
     if (0 == tp || vMax <= 0.0 || ini_maxvel <= 0.0) {
@@ -152,11 +162,12 @@ int tpSetVmax(TP_STRUCT * tp, double vMax, double ini_maxvel)
     return 0;
 }
 
-// I think this is the [TRAJ] max velocity.  This should
-// be the max velocity of the TOOL TIP, not necessarily
-// any particular axis.  This applies to subsequent moves
-// until changed.
-
+/**
+ * (?) Set the tool tip maximum velocity.
+ * I think this is the [TRAJ] max velocity. This should be the max velocity of
+ * the TOOL TIP, not necessarily any particular axis. This applies to
+ * subsequent moves until changed.
+ */
 int tpSetVlimit(TP_STRUCT * tp, double vLimit)
 {
     if (!tp) return -1;
@@ -168,7 +179,6 @@ int tpSetVlimit(TP_STRUCT * tp, double vLimit)
 
     return 0;
 }
-
 
 /** Sets the max acceleration for the trajectory planner. */
 int tpSetAmax(TP_STRUCT * tp, double aMax)
@@ -247,7 +257,7 @@ int tpSetTermCond(TP_STRUCT * tp, int cond, double tolerance)
 int tpSetPos(TP_STRUCT * tp, EmcPose pos)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     tp->currentPos = pos;
@@ -335,15 +345,15 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     tc.indexrotary = -1;
 
     if (syncdio.anychanged != 0) {
-	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
-	tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
+        tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
+        tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
     } else {
-	tc.syncdio.anychanged = 0;
+        tc.syncdio.anychanged = 0;
     }
 
     if (tcqPut(&tp->queue, tc) == -1) {
         rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
-	return -1;
+        return -1;
     }
     
     // do not change tp->goalPos here,
@@ -355,7 +365,6 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
 
     return 0;
 }
-
 
 /**
  * Add a straight line to the tc queue.
@@ -453,7 +462,6 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     } else {
 	tc.syncdio.anychanged = 0;
     }
-
 
     if (tcqPut(&tp->queue, tc) == -1) {
         rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
@@ -567,7 +575,6 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 	tc.syncdio.anychanged = 0;
     }
 
-
     if (tcqPut(&tp->queue, tc) == -1) {
 	return -1;
     }
@@ -579,7 +586,6 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 
     return 0;
 }
-
 
 /**
  * Adjusts blend velocity and acceleration to safe limits.
@@ -670,8 +676,8 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     discr = discr_term1 + discr_term2 + discr_term3;
 
     if(discr < 0.0) {
-        // FIXME - This means we've overshot the target, but with a non-zero
-        // final velocity, it's almost guaranteed to happen.
+        // This means we've overshot the target, so stop here
+        // TODO deal with v_f here
         newvel = maxnewvel = 0.0;
     } 
     else {
@@ -747,14 +753,16 @@ static int tpGetRotaryIsUnlocked(int axis) {
 }
 
 
-// This is the brains of the operation.  It's called every TRAJ period
-// and is expected to set tp->currentPos to the new machine position.
-// Lots of other tp fields (depth, done, etc) have to be twiddled to
-// communicate the status; I think those are spelled out here correctly
-// and I can't clean it up without breaking the API that the TP presents
-// to motion.  It's not THAT bad and in the interest of not touching
-// stuff outside this directory, I'm going to leave it for now.
-
+/**
+ * Calculate an updated goal position for the next timestep.
+ * This is the brains of the operation. It's called every TRAJ period and is
+ * expected to set tp->currentPos to the new machine position. Lots of other
+ * tp fields (depth, done, etc) have to be twiddled to communicate the status;
+ * I think those are spelled out here correctly and I can't clean it up
+ * without breaking the API that the TP presents to motion. It's not THAT bad
+ * and in the interest of not touching stuff outside this directory, I'm going
+ * to leave it for now.
+ */
 int tpRunCycle(TP_STRUCT * tp, long period)
 {
     // vel = (new position - old position) / cycle time
@@ -765,22 +773,26 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     TC_STRUCT *tc, *nexttc;
     double primary_vel;
+    double save_vel;
     int on_final_decel;
     EmcPose primary_before, primary_after;
     EmcPose secondary_before, secondary_after;
     EmcPose primary_displacement, secondary_displacement;
+    
+    // Persistant data stored for future calls to this function
     static double spindleoffset;
     static int waiting_for_index = MOTION_INVALID_ID;
     static int waiting_for_atspeed = MOTION_INVALID_ID;
-    double save_vel;
     static double revs;
+
     EmcPose target;
 
     emcmotStatus->tcqlen = tcqLen(&tp->queue);
     emcmotStatus->requested_vel = 0.0;
     tc = tcqItem(&tp->queue, 0, period);
+
     if(!tc) {
-        // this means the motion queue is empty.  This can represent
+        // this means the motion queue is empty. This can represent
         // the end of the program OR QUEUE STARVATION.  In either case,
         // I want to stop.  Some may not agree that's what it should do.
         tcqInit(&tp->queue);
@@ -1018,9 +1030,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
     }
 
-
     if(!tc->synchronized) emcmotStatus->spindleSync = 0;
-
 
     if(nexttc && nexttc->active == 0) {
         // this means this tc is being read for the first time.
@@ -1035,7 +1045,6 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         if(tc->blend_with_next || nexttc->blend_with_next)
             nexttc->maxaccel /= 2.0;
     }
-
 
     if(tc->synchronized) {
         double pos_error;
@@ -1054,8 +1063,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             if (emcmotStatus->spindle.direction < 0) new_spindlepos = -new_spindlepos;
 
             if(tc->motion_type == TC_RIGIDTAP && 
-               (tc->coords.rigidtap.state == RETRACTION || 
-                tc->coords.rigidtap.state == FINAL_REVERSAL))
+                    (tc->coords.rigidtap.state == RETRACTION || 
+                     tc->coords.rigidtap.state == FINAL_REVERSAL))
                 revs = tc->coords.rigidtap.spindlerevs_at_reversal - 
                     new_spindlepos;
             else
@@ -1092,26 +1101,26 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
         if(tc->reqvel < 0.0) tc->reqvel = 0.0;
         if(nexttc) {
-	    if (nexttc->synchronized) {
-		nexttc->reqvel = tc->reqvel;
-		nexttc->feed_override = 1.0;
-		if(nexttc->reqvel < 0.0) nexttc->reqvel = 0.0;
-	    } else {
-		nexttc->feed_override = emcmotStatus->net_feed_scale;
-	    }
-	}
+            if (nexttc->synchronized) {
+                nexttc->reqvel = tc->reqvel;
+                nexttc->feed_override = 1.0;
+                if(nexttc->reqvel < 0.0) nexttc->reqvel = 0.0;
+            } else {
+                nexttc->feed_override = emcmotStatus->net_feed_scale;
+            }
+        }
     } else {
         tc->feed_override = emcmotStatus->net_feed_scale;
         if(nexttc) {
-	    nexttc->feed_override = emcmotStatus->net_feed_scale;
-	}
+            nexttc->feed_override = emcmotStatus->net_feed_scale;
+        }
     }
     /* handle pausing */
     if(tp->pausing && (!tc->synchronized || tc->velocity_mode)) {
         tc->feed_override = 0.0;
         if(nexttc) {
-	    nexttc->feed_override = 0.0;
-	}
+            nexttc->feed_override = 0.0;
+        }
     }
     
     tcComputeBlendParameters(tc, nexttc);
