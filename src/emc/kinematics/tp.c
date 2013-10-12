@@ -267,6 +267,22 @@ int tpSetPos(TP_STRUCT * tp, EmcPose pos)
 }
 
 /**
+ * Check for valid tp before queueing additional moves.
+ */
+int tpErrorCheck(TP_STRUCT *tp) {
+
+    if (!tp) {
+        rtapi_print_msg(RTAPI_MSG_ERR, "TP is null\n");
+        return -1;
+    }
+    if (tp->aborting) {
+        rtapi_print_msg(RTAPI_MSG_ERR, "TP is aborting\n");
+        return -1;
+    }
+    return 0;
+}
+
+/**
  * Adds a rigid tap cycle to the motion queue.
  */
 int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel, 
@@ -277,14 +293,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     PmCartesian abc, uvw;
     PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
-    if (!tp) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "TP is null\n");
-        return -1;
-    }
-    if (tp->aborting) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "TP is aborting\n");
-	return -1;
-    }
+    if (tpErrorCheck(tp)<0) return -1;
 
     start_xyz.tran = tp->goalPos.tran;
     end_xyz.tran = end.tran;
@@ -381,14 +390,7 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     PmPose start_abc, end_abc;
     PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
-    if (!tp) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "TP is null\n");
-        return -1;
-    }
-    if (tp->aborting) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "TP is aborting\n");
-	return -1;
-    }
+    if (tpErrorCheck(tp)<0) return -1;
 
     start_xyz.tran = tp->goalPos.tran;
     end_xyz.tran = end.tran;
@@ -501,8 +503,7 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     double helix_length;
     PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
-    if (!tp || tp->aborting) 
-	return -1;
+    if (tpErrorCheck(tp)<0) return -1;
 
     start_xyz.tran = tp->goalPos.tran;
     end_xyz.tran = end.tran;
