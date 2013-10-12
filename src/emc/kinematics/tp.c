@@ -239,12 +239,18 @@ int tpSetTermCond(TP_STRUCT * tp, int cond, double tolerance)
         return -1;
     }
 
-    if (cond != TC_TERM_COND_STOP && cond != TC_TERM_COND_BLEND) {
-	return -1;
+    switch (cond) {
+        //Purposeful waterfall for now
+        case TC_TERM_COND_BLEND:
+        case TC_TERM_COND_TANGENT:
+        case TC_TERM_COND_STOP:
+            tp->termCond = cond;
+            tp->tolerance = tolerance;
+            break;
+        default:
+            //Invalid condition
+            return  -1;
     }
-
-    tp->termCond = cond;
-    tp->tolerance = tolerance;
 
     return 0;
 }
@@ -339,7 +345,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     tc.coords.rigidtap.state = TAPPING;
     tc.motion_type = TC_RIGIDTAP;
     tc.canon_motion_type = 0;
-    tc.blend_with_next = 0;
+    tc.term_cond = 0;
     tc.tolerance = tp->tolerance;
 
     if(!tp->synchronized) {
@@ -352,6 +358,8 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     tc.velocity_mode = tp->velocity_mode;
     tc.enables = enables;
     tc.indexrotary = -1;
+
+    tc.finalvel=0.0; //Dummy value for now
 
     if (syncdio.anychanged != 0) {
         tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -449,7 +457,8 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.coords.line.abc = line_abc;
     tc.motion_type = TC_LINEAR;
     tc.canon_motion_type = type;
-    tc.blend_with_next = tp->termCond == TC_TERM_COND_BLEND;
+
+    tc.term_cond = tp->termCond;
     tc.tolerance = tp->tolerance;
 
     tc.synchronized = tp->synchronized;
@@ -457,6 +466,8 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.uu_per_rev = tp->uu_per_rev;
     tc.enables = enables;
     tc.indexrotary = indexrotary;
+
+    tc.finalvel=0.0; //Dummy value for now
 
     if (syncdio.anychanged != 0) {
 	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -560,7 +571,7 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.coords.circle.abc = line_abc;
     tc.motion_type = TC_CIRCULAR;
     tc.canon_motion_type = type;
-    tc.blend_with_next = tp->termCond == TC_TERM_COND_BLEND;
+    tc.term_cond = tp->termCond;
     tc.tolerance = tp->tolerance;
 
     tc.synchronized = tp->synchronized;
@@ -568,6 +579,8 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.uu_per_rev = tp->uu_per_rev;
     tc.enables = enables;
     tc.indexrotary = -1;
+
+    tc.finalvel=0.0; //Dummy value for now
     
     if (syncdio.anychanged != 0) {
 	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -589,12 +602,34 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 }
 
 /**
+ * Handle potential overshoot for tangent segments.
+ * Ending a TC with final velocity often leads to small "overshoots". Since we
+ * are parameterized by arc length, and the next move is tangent, just apply
+ * overshoot to the next TC.
+ */
+static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary_before) {
+    double overshoot=0.0;
+    //Apply any overshoot to the next TC, and make sure its initial
+    //velocity is the same. This gives C1 continuity at tangent blends.
+    if (tc->progress > tc->target) {
+        //Store previous position
+        *secondary_before = tcGetPos(nexttc);
+        overshoot = tc->progress - tc->target;
+        nexttc->progress = overshoot;
+        nexttc->currentvel = tc->currentvel;
+    }
+    //NOTE: we're assuming that tangent blends mean there's enough length in
+    //the next segment to deal with this.  TODO: either add a check here or
+    //make damn sure that the optimizer does its job.
+}
+
+/**
  * Adjusts blend velocity and acceleration to safe limits.
  * If we are blending between tc and nexttc, then we need to figure out what a
  * safe blend velocity is based on the known trajectory parameters. This
  * function updates the TC_STRUCT data with a safe blend velocity.
  */
-void tcComputeBlendParameters(TC_STRUCT* tc, TC_STRUCT* nexttc) {
+static void tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
 
     if(nexttc && nexttc->maxaccel) {
         tc->blend_vel = nexttc->maxaccel * 
@@ -644,7 +679,7 @@ void tcComputeBlendParameters(TC_STRUCT* tc, TC_STRUCT* nexttc) {
 /**
  * Clip (saturate) a value x to be within +/- max.
  */
-inline double saturate(double x, double max) {
+static double saturate(double x, double max) {
     if ( x > max ) return max;
     else if ( x < (-max) ) return -max;
     else return x;
@@ -663,47 +698,47 @@ inline double saturate(double x, double max) {
 void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     double discr, maxnewvel, newvel, newaccel=0, delta_pos;
     double discr_term1, discr_term2, discr_term3;
-    double v_f=0.0; // FIXME Dummy value for now 
 
-    if(!tc->blending) tc->vel_at_blend_start = tc->currentvel;
+    // Find maximum allowed velocity from feed and machine limits
+    double req_vel = tc->reqvel * tc->feed_override;
+    double final_vel = tc->finalvel;
+
+    if (req_vel > tc->maxvel) req_vel = tc->maxvel;
+    //Clamp final velocity to the max velocity we can achieve
+    if (final_vel > req_vel) final_vel = req_vel;
+
+    if (!tc->blending) tc->vel_at_blend_start = tc->currentvel;
 
     delta_pos = tc->target - tc->progress;
 
-    // Descriminant is a little more complicated with final velocity term
-    discr_term1 = pmSq(v_f);
+    discr_term1 = pmSq(final_vel);
     discr_term2 = tc->maxaccel * (2.0 * delta_pos - tc->currentvel * tc->cycle_time);
     discr_term3 = pmSq(tc->maxaccel * tc->cycle_time / 2.0);
 
     discr = discr_term1 + discr_term2 + discr_term3;
 
-    if(discr < 0.0) {
-        // This means we've overshot the target, so stop here
-        // TODO deal with v_f here
+    // Descriminant is a little more complicated with final velocity term If
+    // descriminant < 0, we've overshot (or are about to). Do the best we can
+    // in this situation
+    if (discr < 0.0) {
         newvel = maxnewvel = 0.0;
     } 
     else {
         newvel = maxnewvel = -0.5 * tc->maxaccel * tc->cycle_time + pmSqrt(discr);
     }
 
-    if(newvel <= 0.0) {
-        //TODO deal with v_f here
+    if (newvel > req_vel) newvel = req_vel;
 
-        // If we require a negative velocity, this means that at current
-        // conditions the move will end in between this timestep and the next.
-        //
-        // What we essentially do is shortcut the intergration and just make
-        // our position at this timestep be at the goal. I suspect this has the
-        // effect of momentarily increasing the effective acceleration by up to
-        // double nominal value.
-        newvel = newaccel = 0.0;
-        tc->progress = tc->target;
-    } 
+    if (newvel <= 0.0) {
+        //If we're not hitting a tangent move, then we need to throw out any overshoot to force an exact stop.
+        //FIXME this means a momentary spike in acceleration, test to see if it's a problem
+        newvel = 0.0;
+        if ( !(tc->term_cond == TC_TERM_COND_TANGENT) ) {
+            tc->progress = tc->target;
+        }
+    }
     else {
-        // constrain velocity
-        double req_vel = tc->reqvel * tc->feed_override;
-        if(newvel > req_vel)    newvel = req_vel;
-        if(newvel > tc->maxvel) newvel = tc->maxvel;
-
+        
         bool is_pure_rotary = (tc->motion_type == TC_LINEAR) &&
             (tc->coords.line.xyz.tmag_zero) && (tc->coords.line.uvw.tmag_zero);
         bool is_position_synced = (!tc->synchronized) || tc->velocity_mode;
@@ -711,7 +746,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         // if the motion is not purely rotary axes (and therefore in angular
         // units), clamp motion's velocity at TRAJ MAX_VELOCITY (tooltip
         // maxvel) except when it's synced to spindle position.
-        if(!is_pure_rotary && !is_position_synced && newvel > tp->vLimit) {
+        if (!is_pure_rotary && !is_position_synced && newvel > tp->vLimit) {
             newvel = tp->vLimit;
         }
 
@@ -721,11 +756,13 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
         newvel = tc->currentvel + newaccel * tc->cycle_time;
         // update position in this tc using trapezoidal integration
+        // Note that progress can be greater than the target after this step. 
+        // TODO: handle this in tp
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
+        tc->currentvel = newvel;
     }
-    tc->currentvel = newvel;
-    if(v) *v = newvel;
-    if(on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
+    if (v) *v = newvel;
+    if (on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
 }
 
 void tpToggleDIOs(TC_STRUCT * tc) {
@@ -742,6 +779,154 @@ void tpToggleDIOs(TC_STRUCT * tc) {
         }
 	tc->syncdio.anychanged = 0; //we have turned them all on/off, nothing else to do for this TC the next time
     }
+}
+
+
+/**
+ * Handle special cases for rigid tapping.
+ * This function deals with updating the goal position and spindle position
+ * during a reversal.
+ * TODO: detailed documentation here
+ */
+static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double spindleoffset ){
+
+    static double old_spindlepos;
+    double new_spindlepos = emcmotStatus->spindleRevs;
+    if (emcmotStatus->spindle.direction < 0) new_spindlepos = -new_spindlepos;
+
+    switch (tc->coords.rigidtap.state) {
+        case TAPPING:
+            if (tc->progress >= tc->coords.rigidtap.reversal_target) {
+                // command reversal
+                emcmotStatus->spindle.speed *= -1;
+                tc->coords.rigidtap.state = REVERSING;
+            }
+            break;
+        case REVERSING:
+            if (new_spindlepos < old_spindlepos) {
+                PmPose start, end;
+                PmLine *aux = &tc->coords.rigidtap.aux_xyz;
+                // we've stopped, so set a new target at the original position
+                tc->coords.rigidtap.spindlerevs_at_reversal = new_spindlepos + spindleoffset;
+
+                pmLinePoint(&tc->coords.rigidtap.xyz, tc->progress, &start);
+                end = tc->coords.rigidtap.xyz.start;
+                pmLineInit(aux, start, end);
+                tc->coords.rigidtap.reversal_target = aux->tmag;
+                tc->target = aux->tmag + 10. * tc->uu_per_rev;
+                tc->progress = 0.0;
+
+                tc->coords.rigidtap.state = RETRACTION;
+            }
+            old_spindlepos = new_spindlepos;
+            break;
+        case RETRACTION:
+            if (tc->progress >= tc->coords.rigidtap.reversal_target) {
+                emcmotStatus->spindle.speed *= -1;
+                tc->coords.rigidtap.state = FINAL_REVERSAL;
+            }
+            break;
+        case FINAL_REVERSAL:
+            if (new_spindlepos > old_spindlepos) {
+                PmPose start, end;
+                PmLine *aux = &tc->coords.rigidtap.aux_xyz;
+                pmLinePoint(aux, tc->progress, &start);
+                end = tc->coords.rigidtap.xyz.start;
+                pmLineInit(aux, start, end);
+                tc->target = aux->tmag;
+                tc->progress = 0.0;
+                tc->synchronized = 0;
+                tc->reqvel = tc->maxvel;
+
+                tc->coords.rigidtap.state = FINAL_PLACEMENT;
+            }
+            old_spindlepos = new_spindlepos;
+            break;
+        case FINAL_PLACEMENT:
+            // this is a regular move now, it'll stop at target above.
+            break;
+    }
+}
+
+static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
+        TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* target){
+
+    if(tc->currentvel > nexttc->currentvel) {
+        *target = tcGetEndpoint(tc);
+        tp->motionType = tc->canon_motion_type;
+        emcmotStatus->distance_to_go = tc->target - tc->progress;
+        emcmotStatus->enables_queued = tc->enables;
+        // report our line number to the guis
+        tp->execId = tc->id;
+        emcmotStatus->requested_vel = tc->reqvel;
+    } else {
+        tpToggleDIOs(nexttc); //check and do DIO changes
+        *target = tcGetEndpoint(nexttc);
+        tp->motionType = nexttc->canon_motion_type;
+        emcmotStatus->distance_to_go = nexttc->target - nexttc->progress;
+        emcmotStatus->enables_queued = nexttc->enables;
+        // report our line number to the guis
+        tp->execId = nexttc->id;
+        emcmotStatus->requested_vel = nexttc->reqvel;
+    }
+
+    emcmotStatus->current_vel = tc->currentvel + nexttc->currentvel;
+}
+
+
+/**
+ * Update nexttc during a parabolic blend and compute the secondary displacement.
+ *
+ */
+static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc,TC_STRUCT* nexttc,double primary_vel){
+
+    EmcPose secondary_before = tcGetPos(nexttc);
+    double save_vel = nexttc->reqvel;
+
+    nexttc->reqvel = nexttc->feed_override > 0.0 ? 
+        ((tc->vel_at_blend_start - primary_vel) / nexttc->feed_override) :
+        0.0;
+    tcRunCycle(tp, nexttc, NULL, NULL);
+    nexttc->reqvel = save_vel;
+
+}
+
+/*static void tpDoTangentBlend(TC_STRUCT* nexttc,EmcPose secondary_before,EmcPose* secondary_displacement){*/
+/*}*/
+
+/**
+ * Calculate the displacement between a previous pose and the current position of tc.
+ */
+static void tpFindDisplacement(TC_STRUCT* tc, EmcPose before, EmcPose* displacement){
+
+    EmcPose after = tcGetPos(tc);
+
+    pmCartCartSub(after.tran, before.tran, 
+            &(displacement->tran));
+    displacement->a = after.a - before.a;
+    displacement->b = after.b - before.b;
+    displacement->c = after.c - before.c;
+
+    displacement->u = after.u - before.u;
+    displacement->v = after.v - before.v;
+    displacement->w = after.w - before.w;
+}
+
+
+/**
+ * Update the planner's position, given a displacement.
+ */
+static void tpUpdatePosition(TP_STRUCT* tp,EmcPose* displacement){
+
+    pmCartCartAdd(tp->currentPos.tran, displacement->tran, 
+            &tp->currentPos.tran);
+    tp->currentPos.a += displacement->a;
+    tp->currentPos.b += displacement->b;
+    tp->currentPos.c += displacement->c;
+
+    tp->currentPos.u += displacement->u;
+    tp->currentPos.v += displacement->v;
+    tp->currentPos.w += displacement->w;
 }
 
 //TODO document
@@ -776,9 +961,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     double primary_vel;
     double save_vel;
     int on_final_decel;
-    EmcPose primary_before, primary_after;
-    EmcPose secondary_before, secondary_after;
-    EmcPose primary_displacement, secondary_displacement;
+    EmcPose primary_before, primary_after,primary_displacement;
+    EmcPose secondary_before, secondary_displacement;
     
     // Persistant data stored for future calls to this function
     static double spindleoffset;
@@ -839,26 +1023,26 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     // now we have the active tc.  get the upcoming one, if there is one.
     // it's not an error if there isn't another one - we just don't
     // do blending.  This happens in MDI for instance.
-    if(!emcmotDebug->stepping && tc->blend_with_next) 
+    if(!emcmotDebug->stepping && tc->term_cond) 
         nexttc = tcqItem(&tp->queue, 1, period);
     else
         nexttc = NULL;
 
     {
-	int this_synch_pos = tc->synchronized && !tc->velocity_mode;
-	int next_synch_pos = nexttc && nexttc->synchronized && !nexttc->velocity_mode;
-	if(!this_synch_pos && next_synch_pos) {
-	    // we'll have to wait for spindle sync; might as well
-	    // stop at the right place (don't blend)
-	    tc->blend_with_next = 0;
-	    nexttc = NULL;
-	}
+        int this_synch_pos = tc->synchronized && !tc->velocity_mode;
+        int next_synch_pos = nexttc && nexttc->synchronized && !nexttc->velocity_mode;
+        if(!this_synch_pos && next_synch_pos) {
+            // we'll have to wait for spindle sync; might as well
+            // stop at the right place (don't blend)
+            tc->term_cond = TC_TERM_COND_STOP;
+            nexttc = NULL;
+        }
     }
 
     if(nexttc && nexttc->atspeed) {
         // we'll have to wait for the spindle to be at-speed; might as well
         // stop at the right place (don't blend), like above
-        tc->blend_with_next = 0;
+        tc->term_cond = 0;
         nexttc = NULL;
     }
 
@@ -914,6 +1098,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
     }
 
+    //TODO refactor
     if(tc->active == 0) {
         // this means this tc is being read for the first time.
 
@@ -943,7 +1128,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
         // honor accel constraint in case we happen to make an acute angle
         // with the next segment.
-        if(tc->blend_with_next) 
+        if(tc->term_cond == TC_TERM_COND_BLEND) 
             tc->maxaccel /= 2.0;
 
         if(tc->synchronized) {
@@ -971,65 +1156,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             revs=0;
         }
     }
-
-    if (tc->motion_type == TC_RIGIDTAP) {
-        static double old_spindlepos;
-        double new_spindlepos = emcmotStatus->spindleRevs;
-        if (emcmotStatus->spindle.direction < 0) new_spindlepos = -new_spindlepos;
-
-        switch (tc->coords.rigidtap.state) {
-        case TAPPING:
-            if (tc->progress >= tc->coords.rigidtap.reversal_target) {
-                // command reversal
-                emcmotStatus->spindle.speed *= -1;
-                tc->coords.rigidtap.state = REVERSING;
-            }
-            break;
-        case REVERSING:
-            if (new_spindlepos < old_spindlepos) {
-                PmPose start, end;
-                PmLine *aux = &tc->coords.rigidtap.aux_xyz;
-                // we've stopped, so set a new target at the original position
-                tc->coords.rigidtap.spindlerevs_at_reversal = new_spindlepos + spindleoffset;
-                
-                pmLinePoint(&tc->coords.rigidtap.xyz, tc->progress, &start);
-                end = tc->coords.rigidtap.xyz.start;
-                pmLineInit(aux, start, end);
-                tc->coords.rigidtap.reversal_target = aux->tmag;
-                tc->target = aux->tmag + 10. * tc->uu_per_rev;
-                tc->progress = 0.0;
-
-                tc->coords.rigidtap.state = RETRACTION;
-            }
-            old_spindlepos = new_spindlepos;
-            break;
-        case RETRACTION:
-            if (tc->progress >= tc->coords.rigidtap.reversal_target) {
-                emcmotStatus->spindle.speed *= -1;
-                tc->coords.rigidtap.state = FINAL_REVERSAL;
-            }
-            break;
-        case FINAL_REVERSAL:
-            if (new_spindlepos > old_spindlepos) {
-                PmPose start, end;
-                PmLine *aux = &tc->coords.rigidtap.aux_xyz;
-                pmLinePoint(aux, tc->progress, &start);
-                end = tc->coords.rigidtap.xyz.start;
-                pmLineInit(aux, start, end);
-                tc->target = aux->tmag;
-                tc->progress = 0.0;
-                tc->synchronized = 0;
-                tc->reqvel = tc->maxvel;
-                
-                tc->coords.rigidtap.state = FINAL_PLACEMENT;
-            }
-            old_spindlepos = new_spindlepos;
-            break;
-        case FINAL_PLACEMENT:
-            // this is a regular move now, it'll stop at target above.
-            break;
-        }
-    }
+        
+    if (tc->motion_type == TC_RIGIDTAP) tpHandleRigidTap(emcmotStatus,tc,spindleoffset);
 
     if(!tc->synchronized) emcmotStatus->spindleSync = 0;
 
@@ -1043,10 +1171,12 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
         // honor accel constraint if we happen to make an acute angle with the
         // above segment or the following one
-        if(tc->blend_with_next || nexttc->blend_with_next)
+        // TODO: replace this with better acceleration constraint
+        if(tc->term_cond == TC_TERM_COND_BLEND || nexttc->term_cond == TC_TERM_COND_BLEND)
             nexttc->maxaccel /= 2.0;
     }
 
+    //TODO: refactor into tcUpdateSynchronized?
     if(tc->synchronized) {
         double pos_error;
         double oldrevs = revs;
@@ -1124,94 +1254,59 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
     }
     
-    tcComputeBlendParameters(tc, nexttc);
+    tpComputeBlendVelocity(tc, nexttc);
 
     primary_before = tcGetPos(tc);
+
+    // Update the current tc
     tcRunCycle(tp, tc, &primary_vel, &on_final_decel);
-    primary_after = tcGetPos(tc);
-    pmCartCartSub(primary_after.tran, primary_before.tran, 
-            &primary_displacement.tran);
-    primary_displacement.a = primary_after.a - primary_before.a;
-    primary_displacement.b = primary_after.b - primary_before.b;
-    primary_displacement.c = primary_after.c - primary_before.c;
+    //If we've overshot the target, then fold this into the next move
+    if (tc->term_cond == TC_TERM_COND_TANGENT) tpCheckOvershoot(tc,nexttc,&secondary_before);
+   
+    //Update 
+    tpFindDisplacement(tc,primary_before,&primary_displacement);
 
-    primary_displacement.u = primary_after.u - primary_before.u;
-    primary_displacement.v = primary_after.v - primary_before.v;
-    primary_displacement.w = primary_after.w - primary_before.w;
+    // Update the trajectory planner position based on the results
 
-    // blend criteria
-    if((tc->blending && nexttc) || 
-            (nexttc && on_final_decel && primary_vel < tc->blend_vel)) {
-        // make sure we continue to blend this segment even when its 
-        // accel reaches 0 (at the very end)
-        tc->blending = 1;
+    /* BLENDING STUFF */
+    // make sure we continue to blend this segment even when its 
+    // accel reaches 0 (at the very end)
+    // TODO make sure these conditions accept tangent "blends" as well
+    bool is_blend_start = (tc->term_cond ) && nexttc && on_final_decel && (primary_vel < tc->blend_vel);
 
+    if (is_blend_start) tc->blending = 1;
+
+    if(tc->blending && nexttc ) {
         // hack to show blends in axis
-        // tp->motionType = 0;
+        tp->motionType = 0;
 
-        if(tc->currentvel > nexttc->currentvel) {
-            target = tcGetEndpoint(tc);
-            tp->motionType = tc->canon_motion_type;
-	    emcmotStatus->distance_to_go = tc->target - tc->progress;
-	    emcmotStatus->enables_queued = tc->enables;
-	    // report our line number to the guis
-	    tp->execId = tc->id;
-            emcmotStatus->requested_vel = tc->reqvel;
-        } else {
-	    tpToggleDIOs(nexttc); //check and do DIO changes
-            target = tcGetEndpoint(nexttc);
-            tp->motionType = nexttc->canon_motion_type;
-	    emcmotStatus->distance_to_go = nexttc->target - nexttc->progress;
-	    emcmotStatus->enables_queued = nexttc->enables;
-	    // report our line number to the guis
-	    tp->execId = nexttc->id;
-            emcmotStatus->requested_vel = nexttc->reqvel;
+        tpUpdateBlendStatus(tp, emcmotStatus, tc, nexttc,&target);
+        
+        if (tc->term_cond == TC_TERM_COND_BLEND)
+            tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
+        else if (tc->term_cond == TC_TERM_COND_TANGENT){
+            //Don't need to do any blending, just find the new displacement
+            //Basically, do nothing here
         }
+        tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
 
-        emcmotStatus->current_vel = tc->currentvel + nexttc->currentvel;
+        tpUpdatePosition(tp,&secondary_displacement);
 
-        secondary_before = tcGetPos(nexttc);
-        save_vel = nexttc->reqvel;
-        nexttc->reqvel = nexttc->feed_override > 0.0 ? 
-            ((tc->vel_at_blend_start - primary_vel) / nexttc->feed_override) :
-            0.0;
-        tcRunCycle(tp, nexttc, NULL, NULL);
-        nexttc->reqvel = save_vel;
-
-        secondary_after = tcGetPos(nexttc);
-        pmCartCartSub(secondary_after.tran, secondary_before.tran, 
-                &secondary_displacement.tran);
-        secondary_displacement.a = secondary_after.a - secondary_before.a;
-        secondary_displacement.b = secondary_after.b - secondary_before.b;
-        secondary_displacement.c = secondary_after.c - secondary_before.c;
-
-        secondary_displacement.u = secondary_after.u - secondary_before.u;
-        secondary_displacement.v = secondary_after.v - secondary_before.v;
-        secondary_displacement.w = secondary_after.w - secondary_before.w;
-
-        pmCartCartAdd(tp->currentPos.tran, primary_displacement.tran, 
-                &tp->currentPos.tran);
-        pmCartCartAdd(tp->currentPos.tran, secondary_displacement.tran, 
-                &tp->currentPos.tran);
-        tp->currentPos.a += primary_displacement.a + secondary_displacement.a;
-        tp->currentPos.b += primary_displacement.b + secondary_displacement.b;
-        tp->currentPos.c += primary_displacement.c + secondary_displacement.c;
-
-        tp->currentPos.u += primary_displacement.u + secondary_displacement.u;
-        tp->currentPos.v += primary_displacement.v + secondary_displacement.v;
-        tp->currentPos.w += primary_displacement.w + secondary_displacement.w;
     } else {
-	tpToggleDIOs(tc); //check and do DIO changes
+        tpToggleDIOs(tc); //check and do DIO changes
         target = tcGetEndpoint(tc);
         tp->motionType = tc->canon_motion_type;
-	emcmotStatus->distance_to_go = tc->target - tc->progress;
-        tp->currentPos = primary_after;
+        emcmotStatus->distance_to_go = tc->target - tc->progress;
+        
+
         emcmotStatus->current_vel = tc->currentvel;
         emcmotStatus->requested_vel = tc->reqvel;
-	emcmotStatus->enables_queued = tc->enables;
-	// report our line number to the guis
-	tp->execId = tc->id;
+        emcmotStatus->enables_queued = tc->enables;
+        // report our line number to the guis
+        tp->execId = tc->id;
     }
+
+    tpUpdatePosition(tp,&primary_displacement);
 
     emcmotStatus->dtg.tran.x = target.tran.x - tp->currentPos.tran.x;
     emcmotStatus->dtg.tran.y = target.tran.y - tp->currentPos.tran.y;

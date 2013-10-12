@@ -18,13 +18,14 @@
 #include "posemath.h"
 #include "emcpos.h"
 #include "emcmotcfg.h"
+#include <stdbool.h>
 
 //TODO make these enums?
 /* values for endFlag */
-#define TC_TERM_COND_STOP 1
-#define TC_TERM_COND_BLEND 2
+#define TC_TERM_COND_STOP 0
+#define TC_TERM_COND_BLEND 1
 /** Alternative end flag to show that TC has non-zero final velocity */
-#define TC_TERM_COND_TANGENT 3
+#define TC_TERM_COND_TANGENT 2
 
 #define TC_LINEAR 1
 #define TC_CIRCULAR 2
@@ -78,6 +79,7 @@ typedef struct {
     double feed_override;   // feed override requested by user
     double maxvel;          // max possible vel (feed override stops here)
     double currentvel;      // keep track of current step (vel * cycle_time)
+    double finalvel;        // velocity to aim for at end of segment
     
     int id;                 // segment's serial number
 
@@ -92,8 +94,9 @@ typedef struct {
                             // TC_RIGIDTAP (coords.rigidtap)
     char active;            // this motion is being executed
     int canon_motion_type;  // this motion is due to which canon function?
-    int blend_with_next;    // gcode requests continuous feed at the end of 
+    int term_cond;    // gcode requests continuous feed at the end of 
                             // this segment (g64 mode)
+
     int blending;           // segment is being blended into following segment
     double blend_vel;       // velocity below which we should start blending
     double tolerance;       // during the blend at the end of this move, 
