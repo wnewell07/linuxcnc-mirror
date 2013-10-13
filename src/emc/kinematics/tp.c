@@ -908,7 +908,7 @@ static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
  */
 static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, double primary_vel){
 
-    EmcPose secondary_before = tcGetPos(nexttc);
+    /*EmcPose secondary_before = tcGetPos(nexttc);*/
     //Store the actual requested velocity
     double save_vel = nexttc->reqvel;
 
@@ -959,6 +959,27 @@ static void tpUpdatePosition(TP_STRUCT* tp,EmcPose* displacement){
     tp->currentPos.w += displacement->w;
 }
 
+
+/**
+ * Cleanup if tc is not valid (empty queue). 
+ * This can represent the end of the
+ * program OR QUEUE STARVATION.  In either case, I want to stop.  Some may not
+ * agree that's what it should do.
+ */
+static void tpHandleEmptyQueue(TP_STRUCT* tp, emcmot_status_t* emcmotStatus){
+
+    tcqInit(&tp->queue);
+    tp->goalPos = tp->currentPos;
+    tp->done = 1;
+    tp->depth = tp->activeDepth = 0;
+    tp->aborting = 0;
+    tp->execId = 0;
+    tp->motionType = 0;
+    tpResume(tp);
+    // when not executing a move, use the current enable flags
+    emcmotStatus->enables_queued = emcmotStatus->enables_new;
+}
+
 //TODO document
 static void tpSetRotaryUnlock(int axis, int unlock) {
     emcmotSetRotaryUnlock(axis, unlock);
@@ -991,7 +1012,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     double primary_vel;
     /*double save_vel;*/
     int on_final_decel;
-    EmcPose primary_before, primary_after,primary_displacement;
+    EmcPose primary_before, primary_displacement;
     EmcPose secondary_before, secondary_displacement;
     
     // Persistant data stored for future calls to this function
@@ -1007,19 +1028,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     tc = tcqItem(&tp->queue, 0, period);
 
     if(!tc) {
-        // this means the motion queue is empty. This can represent
-        // the end of the program OR QUEUE STARVATION.  In either case,
-        // I want to stop.  Some may not agree that's what it should do.
-        tcqInit(&tp->queue);
-        tp->goalPos = tp->currentPos;
-        tp->done = 1;
-        tp->depth = tp->activeDepth = 0;
-        tp->aborting = 0;
-        tp->execId = 0;
-        tp->motionType = 0;
-        tpResume(tp);
-	// when not executing a move, use the current enable flags
-        emcmotStatus->enables_queued = emcmotStatus->enables_new;
+        tpHandleEmptyQueue(tp,emcmotStatus);
         return 0;
     }
 
@@ -1135,8 +1144,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         // wait for atspeed, if motion requested it.  also, force
         // atspeed check for the start of all spindle synchronized
         // moves.
-        if((tc->atspeed || (tc->synchronized && !tc->velocity_mode && !emcmotStatus->spindleSync)) && 
-           !emcmotStatus->spindle_is_atspeed) {
+        bool needs_atspeed = tc->atspeed || 
+            (tc->synchronized && !tc->velocity_mode && !emcmotStatus->spindleSync);
+        if( needs_atspeed && !(emcmotStatus->spindle_is_atspeed)) {
             waiting_for_atspeed = tc->id;
             return 0;
         }
@@ -1150,6 +1160,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                 return 0;
         }
 
+        rtapi_print("Activate tc id %d\n",tc->id);
         tc->active = 1;
         tc->currentvel = 0;
         tp->depth = tp->activeDepth = 1;
@@ -1194,7 +1205,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if(nexttc && nexttc->active == 0) {
         // this means this tc is being read for the first time.
-        rtapi_print("activate nexttc id %d\n",tc->id);
+        rtapi_print("Activate nexttc id %d\n",tc->id);
         nexttc->currentvel = 0;
         tp->depth = tp->activeDepth = 1;
         nexttc->active = 1;
