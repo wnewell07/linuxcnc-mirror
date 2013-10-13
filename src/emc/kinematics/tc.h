@@ -20,7 +20,6 @@
 #include "emcmotcfg.h"
 #include <stdbool.h>
 
-//TODO make these enums?
 /* values for endFlag */
 #define TC_TERM_COND_STOP 1
 //HACK temporarily swap flags to use G64 to enable tangent blends

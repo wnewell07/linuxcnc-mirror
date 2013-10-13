@@ -467,6 +467,7 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.enables = enables;
     tc.indexrotary = indexrotary;
     
+    //KLUDGE temporary hack to fake optimization from hand-tuned G-code
     if (tc.term_cond == TC_TERM_COND_TANGENT){
         tc.finalvel=tc.reqvel/2.0;
     }
@@ -583,7 +584,11 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.enables = enables;
     tc.indexrotary = -1;
 
-    tc.finalvel=0.0; //Dummy value for now
+    //KLUDGE temporary hack to fake optimization from hand-tuned G-code
+    if (tc.term_cond == TC_TERM_COND_TANGENT){
+        tc.finalvel=tc.reqvel/2.0;
+    }
+    else   tc.finalvel=0.0; //Dummy value for now
     
     if (syncdio.anychanged != 0) {
 	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -867,6 +872,10 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double
     }
 }
 
+/**
+ * Update motor status based on blend properties.
+ * This function updates the status outputs for GUI's and other stuff.
+ */
 static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
         TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* target){
 
@@ -894,18 +903,20 @@ static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
 
 
 /**
- * Update nexttc during a parabolic blend and compute the secondary displacement.
- *
+ * Do a parabolic blend by updating the nexttc.
+ * Perform the actual blending process by updating the nexttc.
  */
 static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, double primary_vel){
 
     EmcPose secondary_before = tcGetPos(nexttc);
+    //Store the actual requested velocity
     double save_vel = nexttc->reqvel;
 
     nexttc->reqvel = nexttc->feed_override > 0.0 ? 
         ((tc->vel_at_blend_start - primary_vel) / nexttc->feed_override) :
         0.0;
     tcRunCycle(tp, nexttc, NULL, NULL);
+    //Restore the blend velocity
     nexttc->reqvel = save_vel;
 
 }
@@ -914,7 +925,7 @@ static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, 
 /*}*/
 
 /**
- * Calculate the displacement between a previous pose and the current position of tc.
+ * Calculate the displacement between a previous pose and current tc position.
  */
 static void tpFindDisplacement(TC_STRUCT* tc, EmcPose before, EmcPose* displacement){
 
@@ -1008,7 +1019,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         tp->motionType = 0;
         tpResume(tp);
 	// when not executing a move, use the current enable flags
-	emcmotStatus->enables_queued = emcmotStatus->enables_new;
+        emcmotStatus->enables_queued = emcmotStatus->enables_new;
         return 0;
     }
 
@@ -1147,6 +1158,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
         // honor accel constraint in case we happen to make an acute angle
         // with the next segment.
+        // TODO better acceleration constraints?
         if(tc->term_cond == TC_TERM_COND_BLEND) 
             tc->maxaccel /= 2.0;
 

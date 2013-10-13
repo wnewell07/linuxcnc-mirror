@@ -11,8 +11,12 @@ G1 X4.75 F3.75
 G1 X5 F10
 G1 X5.5 F50
 G1 X6 F40
+G3 X7. Y1. R1.
+G1 Y2.
+G3 X6. Y3. R1.
+G1 X5
 G61
-G1 X6.5 F20
+G1 X4.5 F22
 
 (Will probably crash here...)
 M30
