@@ -617,6 +617,7 @@ static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary
         overshoot = tc->progress - tc->target;
         nexttc->progress = overshoot;
         nexttc->currentvel = tc->currentvel;
+        rtapi_print("Overshot by %f at end of move %d\n",overshoot,tc->id);
     }
     //NOTE: we're assuming that tangent blends mean there's enough length in
     //the next segment to deal with this.  TODO: either add a check here or
@@ -674,6 +675,7 @@ static void tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
             }
         }
     }
+    /*rtapi_print("Blend vel of id %d is %f\n",tc->id,tc->blend_vel);*/
 }
 
 /**
@@ -732,8 +734,10 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     if (newvel <= 0.0) {
         //If we're not hitting a tangent move, then we need to throw out any overshoot to force an exact stop.
         //FIXME this means a momentary spike in acceleration, test to see if it's a problem
-        newvel = 0.0;
+        newvel = maxnewvel = 0.0;
+
         if ( !(tc->term_cond == TC_TERM_COND_TANGENT) ) {
+            rtapi_print("goal between timesteps, calculated T-P = %f\n", tc->target-tc->progress);
             tc->progress = tc->target;
         }
     }
@@ -761,6 +765,8 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
         tc->currentvel = newvel;
     }
+    rtapi_print("tcRunCycle: desc = %f, v = %f,progress = %f, vf = %f\n",discr, newvel, tc->progress,final_vel);
+
     if (v) *v = newvel;
     if (on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
 }
@@ -878,7 +884,7 @@ static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
  * Update nexttc during a parabolic blend and compute the secondary displacement.
  *
  */
-static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc,TC_STRUCT* nexttc,double primary_vel){
+static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, double primary_vel){
 
     EmcPose secondary_before = tcGetPos(nexttc);
     double save_vel = nexttc->reqvel;
@@ -919,7 +925,7 @@ static void tpFindDisplacement(TC_STRUCT* tc, EmcPose before, EmcPose* displacem
 static void tpUpdatePosition(TP_STRUCT* tp,EmcPose* displacement){
 
     pmCartCartAdd(tp->currentPos.tran, displacement->tran, 
-            &tp->currentPos.tran);
+            &(tp->currentPos.tran));
     tp->currentPos.a += displacement->a;
     tp->currentPos.b += displacement->b;
     tp->currentPos.c += displacement->c;
@@ -959,7 +965,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     TC_STRUCT *tc, *nexttc;
     double primary_vel;
-    double save_vel;
+    /*double save_vel;*/
     int on_final_decel;
     EmcPose primary_before, primary_after,primary_displacement;
     EmcPose secondary_before, secondary_displacement;
@@ -1163,7 +1169,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if(nexttc && nexttc->active == 0) {
         // this means this tc is being read for the first time.
-
+        rtapi_print("activate nexttc id %d\n",tc->id);
         nexttc->currentvel = 0;
         tp->depth = tp->activeDepth = 1;
         nexttc->active = 1;
@@ -1254,7 +1260,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
     }
     
-    tpComputeBlendVelocity(tc, nexttc);
+    if (tc->term_cond == TC_TERM_COND_BLEND) tpComputeBlendVelocity(tc, nexttc);
 
     primary_before = tcGetPos(tc);
 
@@ -1272,7 +1278,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     // make sure we continue to blend this segment even when its 
     // accel reaches 0 (at the very end)
     // TODO make sure these conditions accept tangent "blends" as well
-    bool is_blend_start = (tc->term_cond ) && nexttc && on_final_decel && (primary_vel < tc->blend_vel);
+    bool is_blend_start = (tc->term_cond == TC_TERM_COND_BLEND ) && nexttc && on_final_decel && (primary_vel < tc->blend_vel);
 
     if (is_blend_start) tc->blending = 1;
 
@@ -1280,7 +1286,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         // hack to show blends in axis
         tp->motionType = 0;
 
-        tpUpdateBlendStatus(tp, emcmotStatus, tc, nexttc,&target);
+        tpUpdateBlendStatus(tp, emcmotStatus, tc, nexttc, &target);
+        secondary_before = tcGetPos(nexttc);
         
         if (tc->term_cond == TC_TERM_COND_BLEND)
             tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
@@ -1297,8 +1304,6 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         target = tcGetEndpoint(tc);
         tp->motionType = tc->canon_motion_type;
         emcmotStatus->distance_to_go = tc->target - tc->progress;
-        
-
         emcmotStatus->current_vel = tc->currentvel;
         emcmotStatus->requested_vel = tc->reqvel;
         emcmotStatus->enables_queued = tc->enables;
