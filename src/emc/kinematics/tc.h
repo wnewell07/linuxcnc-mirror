@@ -23,9 +23,10 @@
 //TODO make these enums?
 /* values for endFlag */
 #define TC_TERM_COND_STOP 1
-#define TC_TERM_COND_BLEND 2
+//HACK temporarily swap flags to use G64 to enable tangent blends
+#define TC_TERM_COND_BLEND 3
 /** Alternative end flag to show that TC has non-zero final velocity */
-#define TC_TERM_COND_TANGENT 3
+#define TC_TERM_COND_TANGENT 2
 
 #define TC_LINEAR 1
 #define TC_CIRCULAR 2

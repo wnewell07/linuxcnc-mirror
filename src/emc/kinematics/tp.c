@@ -466,8 +466,11 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.uu_per_rev = tp->uu_per_rev;
     tc.enables = enables;
     tc.indexrotary = indexrotary;
-
-    tc.finalvel=0.0; //Dummy value for now
+    
+    if (tc.term_cond == TC_TERM_COND_TANGENT){
+        tc.finalvel=tc.reqvel/2.0;
+    }
+    else   tc.finalvel=0.0; //Dummy value for now
 
     if (syncdio.anychanged != 0) {
 	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -615,9 +618,17 @@ static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary
         //Store previous position
         *secondary_before = tcGetPos(nexttc);
         overshoot = tc->progress - tc->target;
-        nexttc->progress = overshoot;
-        nexttc->currentvel = tc->currentvel;
-        rtapi_print("Overshot by %f at end of move %d\n",overshoot,tc->id);
+        if (nexttc){
+            nexttc->progress = overshoot;
+            nexttc->currentvel = tc->currentvel;
+            tc->progress=tc->target;
+            rtapi_print("Overshot by %f at end of move %d\n",overshoot,tc->id);
+            rtapi_print("setting init vel to %f\n",nexttc->currentvel);
+        }
+        else {
+            //Kludge fix to see if we can catch the crash at the end of the dummy toolpath
+            tc->progress=tc->target;
+        }
     }
     //NOTE: we're assuming that tangent blends mean there's enough length in
     //the next segment to deal with this.  TODO: either add a check here or
@@ -703,11 +714,13 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
     // Find maximum allowed velocity from feed and machine limits
     double req_vel = tc->reqvel * tc->feed_override;
-    double final_vel = tc->finalvel;
+    double final_vel = tc->finalvel * tc->feed_override;
 
     if (req_vel > tc->maxvel) req_vel = tc->maxvel;
     //Clamp final velocity to the max velocity we can achieve
     if (final_vel > req_vel) final_vel = req_vel;
+    // Need this to plan down to zero V
+    if (tp->pausing) final_vel = 0.0;
 
     if (!tc->blending) tc->vel_at_blend_start = tc->currentvel;
 

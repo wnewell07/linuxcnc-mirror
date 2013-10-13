@@ -1,0 +1,19 @@
+G61
+
+G0 X0. Y0. Z0.
+G64
+G1 X1 F120
+G1 X2 F60
+G1 X3 F30
+G1 X4 F15
+G1 X4.5 F7.5
+G1 X4.75 F3.75
+G1 X5 F10
+G1 X5.5 F50
+G1 X6 F40
+G61
+G1 X6.5 F20
+
+(Will probably crash here...)
+M30
+%
