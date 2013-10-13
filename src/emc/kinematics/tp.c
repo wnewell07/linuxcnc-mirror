@@ -1293,6 +1293,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     // TODO make sure these conditions accept tangent "blends" as well
     bool is_blend_start = (tc->term_cond == TC_TERM_COND_BLEND ) && nexttc && on_final_decel && (primary_vel < tc->blend_vel);
 
+    bool is_tangent_blend_start = (tc->term_cond == TC_TERM_COND_TANGENT ) && nexttc && tc->target==tc->progress;
     if (is_blend_start) tc->blending = 1;
 
     if(tc->blending && nexttc ) {
@@ -1302,17 +1303,18 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         tpUpdateBlendStatus(tp, emcmotStatus, tc, nexttc, &target);
         secondary_before = tcGetPos(nexttc);
         
-        if (tc->term_cond == TC_TERM_COND_BLEND)
-            tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
-        else if (tc->term_cond == TC_TERM_COND_TANGENT){
-            //Don't need to do any blending, just find the new displacement
-            //Basically, do nothing here
-        }
+        tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
         tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
 
         tpUpdatePosition(tp,&secondary_displacement);
+        tpUpdatePosition(tp,&primary_displacement);
 
-    } else {
+    } 
+    else {
+        if (is_tangent_blend_start){
+            tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
+            tpUpdatePosition(tp,&secondary_displacement);
+        }
         tpToggleDIOs(tc); //check and do DIO changes
         target = tcGetEndpoint(tc);
         tp->motionType = tc->canon_motion_type;
@@ -1322,9 +1324,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         emcmotStatus->enables_queued = tc->enables;
         // report our line number to the guis
         tp->execId = tc->id;
+        tpUpdatePosition(tp,&primary_displacement);
     }
 
-    tpUpdatePosition(tp,&primary_displacement);
 
     emcmotStatus->dtg.tran.x = target.tran.x - tp->currentPos.tran.x;
     emcmotStatus->dtg.tran.y = target.tran.y - tp->currentPos.tran.y;
