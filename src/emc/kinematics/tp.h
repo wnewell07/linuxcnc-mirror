@@ -16,6 +16,7 @@
 
 #include "posemath.h"
 #include "tc.h"
+#include <stdbool.h>
 
 #define TP_DEFAULT_QUEUE_SIZE 32
 
