@@ -749,7 +749,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
     if (newvel > req_vel) newvel = req_vel;
 
-    if (newvel <= 0.0) {
+    if (newvel < 0.0) {
         //If we're not hitting a tangent move, then we need to throw out any overshoot to force an exact stop.
         //FIXME this means a momentary spike in acceleration, test to see if it's a problem
         newvel = maxnewvel = 0.0;
