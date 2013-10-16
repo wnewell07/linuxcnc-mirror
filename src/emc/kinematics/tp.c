@@ -812,7 +812,7 @@ void tpToggleDIOs(TC_STRUCT * tc) {
  * during a reversal.
  * TODO: detailed documentation here
  */
-static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double spindleoffset ){
+static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spindle_status_t* status ){
 
     static double old_spindlepos;
     double new_spindlepos = emcmotStatus->spindleRevs;
@@ -831,7 +831,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double
                 PmPose start, end;
                 PmLine *aux = &tc->coords.rigidtap.aux_xyz;
                 // we've stopped, so set a new target at the original position
-                tc->coords.rigidtap.spindlerevs_at_reversal = new_spindlepos + spindleoffset;
+                tc->coords.rigidtap.spindlerevs_at_reversal = new_spindlepos + status->offset;
 
                 pmLinePoint(&tc->coords.rigidtap.xyz, tc->progress, &start);
                 end = tc->coords.rigidtap.xyz.start;
@@ -859,6 +859,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double
                 pmLineInit(aux, start, end);
                 tc->target = aux->tmag;
                 tc->progress = 0.0;
+                //No longer need spindle sync at this point
                 tc->synchronized = 0;
                 tc->reqvel = tc->maxvel;
 
@@ -872,33 +873,33 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, double
     }
 }
 
+
 /**
- * Update motor status based on blend properties.
- * This function updates the status outputs for GUI's and other stuff.
+ * Update emcMotStatus with information about trajectory motion.
+ * Based on the specified trajectory segment tc, read its progress and status
+ * flags. Then, update the emcmotStatus structure with this information.
  */
-static void tpUpdateBlendStatus(TP_STRUCT* tp, emcmot_status_t* emcmotStatus,
-        TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* target){
+static void tpUpdateMovementStatus(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcmotStatus){
+    EmcPose target = tcGetEndpoint(tc);
 
-    if(tc->currentvel > nexttc->currentvel) {
-        *target = tcGetEndpoint(tc);
-        tp->motionType = tc->canon_motion_type;
-        emcmotStatus->distance_to_go = tc->target - tc->progress;
-        emcmotStatus->enables_queued = tc->enables;
-        // report our line number to the guis
-        tp->execId = tc->id;
-        emcmotStatus->requested_vel = tc->reqvel;
-    } else {
-        tpToggleDIOs(nexttc); //check and do DIO changes
-        *target = tcGetEndpoint(nexttc);
-        tp->motionType = nexttc->canon_motion_type;
-        emcmotStatus->distance_to_go = nexttc->target - nexttc->progress;
-        emcmotStatus->enables_queued = nexttc->enables;
-        // report our line number to the guis
-        tp->execId = nexttc->id;
-        emcmotStatus->requested_vel = nexttc->reqvel;
-    }
+    tp->motionType = tc->canon_motion_type;
+    emcmotStatus->distance_to_go = tc->target - tc->progress;
+    emcmotStatus->enables_queued = tc->enables;
+    // report our line number to the guis
+    tp->execId = tc->id;
+    emcmotStatus->requested_vel = tc->reqvel;
+    emcmotStatus->current_vel = tc->currentvel;
 
-    emcmotStatus->current_vel = tc->currentvel + nexttc->currentvel;
+    emcmotStatus->dtg.tran.x = target.tran.x - tp->currentPos.tran.x;
+    emcmotStatus->dtg.tran.y = target.tran.y - tp->currentPos.tran.y;
+    emcmotStatus->dtg.tran.z = target.tran.z - tp->currentPos.tran.z;
+    emcmotStatus->dtg.a = target.a - tp->currentPos.a;
+    emcmotStatus->dtg.b = target.b - tp->currentPos.b;
+    emcmotStatus->dtg.c = target.c - tp->currentPos.c;
+    emcmotStatus->dtg.u = target.u - tp->currentPos.u;
+    emcmotStatus->dtg.v = target.v - tp->currentPos.v;
+    emcmotStatus->dtg.w = target.w - tp->currentPos.w;
+
 }
 
 
@@ -991,6 +992,173 @@ static int tpGetRotaryIsUnlocked(int axis) {
 
 
 /**
+ * Cleanup after a trajectory segment is complete.
+ * If the current move is complete and we're not waiting on the spindle for
+ * this move, then pop if off the queue and perform cleanup operations.
+ * Finally, get the next move in the queue.
+ */
+static int tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_status_t* status){
+    if (tc->target == tc->progress && status->waiting_for_atspeed != tc->id) {
+        // if we're synced, and this move is ending, save the
+        // spindle position so the next synced move can be in
+        // the right place.
+        if(tc->synchronized)
+            status->offset += tc->target/tc->uu_per_rev;
+        else
+            status->offset = 0.0;
+
+        if(tc->indexrotary != -1) {
+            // this was an indexing move, so before we remove it we must
+            // relock the axis
+            tpSetRotaryUnlock(tc->indexrotary, 0);
+            // if it is now locked, fall through and remove the finished move.
+            // otherwise, just come back later and check again
+            if(tpGetRotaryIsUnlocked(tc->indexrotary))
+                return 0;
+        }
+
+        // done with this move
+        tcqRemove(&tp->queue, 1);
+
+        // so get next move
+        tc = tcqItem(&tp->queue, 0, 0.0);
+        if(!tc) return 0;
+    }
+    //FIXME consistent error codes!
+    return 1;
+}
+
+static int tpHandleAbort(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, tp_spindle_status_t* status){
+
+    // an abort message has come
+    if( MOTION_ID_VALID(status->waiting_for_index) ||
+            MOTION_ID_VALID(status->waiting_for_atspeed) ||
+            (tc->currentvel == 0.0 && !nexttc) || 
+            (tc->currentvel == 0.0 && nexttc && nexttc->currentvel == 0.0) ) {
+        tcqInit(&tp->queue);
+        tp->goalPos = tp->currentPos;
+        tp->done = 1;
+        tp->depth = tp->activeDepth = 0;
+        tp->aborting = 0;
+        tp->execId = 0;
+        tp->motionType = 0;
+        tp->synchronized = 0;
+        status->waiting_for_index = MOTION_INVALID_ID;
+        status->waiting_for_atspeed = MOTION_INVALID_ID;
+        emcmotStatus->spindleSync = 0;
+        tpResume(tp);
+        return 0;
+    } else {
+        tc->reqvel = 0.0;
+        if(nexttc) nexttc->reqvel = 0.0;
+    }
+    //FIXME consistent error codes
+    return 1;
+
+}
+
+
+/**
+ * Check if the segment waiting for an index has changed.
+ * If the current segment waiting for an index is not the current segment, then
+ * something has gone wrong. The fix for now is to just update status so we're
+ * waiting in the current segment instead. (Rob's understanding)
+ */
+static int tpCheckWaiting(TC_STRUCT* tc, tp_spindle_status_t* status){
+
+    // this is no longer the segment we were waiting_for_index for
+    if (MOTION_ID_VALID(status->waiting_for_index) && status->waiting_for_index != tc->id) 
+    {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "Was waiting for index on motion id %d, but reached id %d\n",
+                status->waiting_for_index, tc->id);
+        status->waiting_for_index = MOTION_INVALID_ID;
+    }
+    if (MOTION_ID_VALID(status->waiting_for_atspeed) && status->waiting_for_atspeed != tc->id)  
+    {
+
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "Was waiting for atspeed on motion id %d, but reached id %d\n",
+                status->waiting_for_atspeed, tc->id);
+        status->waiting_for_atspeed = MOTION_INVALID_ID;
+    }
+    //FIXME implement error code if need be later
+    return 0;
+}
+
+
+/**
+ * "Activate" a segment being read for the first time.
+ * This function handles initial setup of a new segment read off of the queue
+ * for the first time.
+ */
+static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcmotStatus,
+        tp_spindle_status_t* status ){
+
+    // wait for atspeed, if motion requested it.  also, force
+    // atspeed check for the start of all spindle synchronized
+    // moves.
+    bool needs_atspeed = tc->atspeed || 
+        (tc->synchronized && !(tc->velocity_mode) && !(emcmotStatus->spindleSync));
+    if( needs_atspeed && !(emcmotStatus->spindle_is_atspeed)) {
+        status->waiting_for_atspeed = tc->id;
+        return 1;
+    }
+
+    if (tc->indexrotary != -1) {
+        // request that the axis unlock
+        tpSetRotaryUnlock(tc->indexrotary, 1);
+        // if it is unlocked, fall through and start the move.
+        // otherwise, just come back later and check again
+        if (!tpGetRotaryIsUnlocked(tc->indexrotary))
+            return 1;
+    }
+
+    // Temporary debug message
+    rtapi_print("Activate tc id %d\n",tc->id);
+
+    tc->active = 1;
+    tc->currentvel = 0;
+    //FIXME activedepth might change meaning with lookahead?
+    tp->depth = tp->activeDepth = 1;
+    tp->motionType = tc->canon_motion_type;
+    tc->blending = 0;
+
+    // honor accel constraint in case we happen to make an acute angle
+    // with the next segment.
+    // TODO better acceleration constraints?
+    if(tc->term_cond == TC_TERM_COND_BLEND) 
+        tc->maxaccel /= 2.0;
+
+    if(tc->synchronized) {
+        if(!tc->velocity_mode && !(emcmotStatus->spindleSync)) {
+            // if we aren't already synced, wait
+            status->waiting_for_index = tc->id;
+            // ask for an index reset
+            emcmotStatus->spindle_index_enable = 1;
+            status->offset = 0.0;
+            // don't move: wait
+            return 1;
+        }
+    }
+
+    //Keep going:
+    return 0;
+}
+
+
+static void tcUpdateVelocityMode(TC_STRUCT* tc, TC_STRUCT* nexttc, double speed,
+        double net_feed_scale) {
+    //NOTE: check for aborting outside of here
+
+    double pos_error = fabs(speed) * tc->uu_per_rev;
+    //Take into account blending?
+    if(nexttc) pos_error -= nexttc->progress; /* ?? */
+    tc->feed_override = net_feed_scale;
+    tc->reqvel = pos_error;
+}
+
+/**
  * Calculate an updated goal position for the next timestep.
  * This is the brains of the operation. It's called every TRAJ period and is
  * expected to set tp->currentPos to the new machine position. Lots of other
@@ -1008,23 +1176,29 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     // acc = (new vel - old vel) / cycle time
     // (three position points required)
 
+    //Pointer to next trajectory component
     TC_STRUCT *tc, *nexttc;
+
     double primary_vel;
-    /*double save_vel;*/
     int on_final_decel;
+
+    //Pose data used for intermediate calculations
     EmcPose primary_before, primary_displacement;
     EmcPose secondary_before, secondary_displacement;
-    
-    // Persistant data stored for future calls to this function
-    static double spindleoffset;
-    static int waiting_for_index = MOTION_INVALID_ID;
-    static int waiting_for_atspeed = MOTION_INVALID_ID;
-    static double revs;
 
+    //Pose data used for updating emcmot status
     EmcPose target;
+    
+    // Persistant spindle data for spindle-synchronized motion
+    static tp_spindle_status_t spindle_status = {0.0,MOTION_INVALID_ID,
+        MOTION_INVALID_ID,0.0};
 
+    //Update motion status 
     emcmotStatus->tcqlen = tcqLen(&tp->queue);
+    //FIXME why is this zero?
     emcmotStatus->requested_vel = 0.0;
+    //Define TC as the "first" element in the queue
+    //FIXME remove period field from this function
     tc = tcqItem(&tp->queue, 0, period);
 
     if(!tc) {
@@ -1032,33 +1206,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         return 0;
     }
 
-    if (tc->target == tc->progress && waiting_for_atspeed != tc->id) {
-        // if we're synced, and this move is ending, save the
-        // spindle position so the next synced move can be in
-        // the right place.
-        if(tc->synchronized)
-            spindleoffset += tc->target/tc->uu_per_rev;
-        else
-            spindleoffset = 0.0;
-
-        if(tc->indexrotary != -1) {
-            // this was an indexing move, so before we remove it we must
-            // relock the axis
-            tpSetRotaryUnlock(tc->indexrotary, 0);
-            // if it is now locked, fall through and remove the finished move.
-            // otherwise, just come back later and check again
-            if(tpGetRotaryIsUnlocked(tc->indexrotary))
-                return 0;
-        }
-
-        // done with this move
-        tcqRemove(&tp->queue, 1);
-
-        // so get next move
-        tc = tcqItem(&tp->queue, 0, period);
-        if(!tc) return 0;
-    }
-
+    tpCompleteSegment(tp, tc, &spindle_status);
     // now we have the active tc.  get the upcoming one, if there is one.
     // it's not an error if there isn't another one - we just don't
     // do blending.  This happens in MDI for instance.
@@ -1086,120 +1234,44 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     }
 
     if(tp->aborting) {
-        // an abort message has come
-        if( MOTION_ID_VALID(waiting_for_index) ||
-	    MOTION_ID_VALID(waiting_for_atspeed) ||
-            (tc->currentvel == 0.0 && !nexttc) || 
-            (tc->currentvel == 0.0 && nexttc && nexttc->currentvel == 0.0) ) {
-            tcqInit(&tp->queue);
-            tp->goalPos = tp->currentPos;
-            tp->done = 1;
-            tp->depth = tp->activeDepth = 0;
-            tp->aborting = 0;
-            tp->execId = 0;
-            tp->motionType = 0;
-            tp->synchronized = 0;
-            waiting_for_index = MOTION_INVALID_ID;
-            waiting_for_atspeed = MOTION_INVALID_ID;
-            emcmotStatus->spindleSync = 0;
-            tpResume(tp);
-            return 0;
-        } else {
-            tc->reqvel = 0.0;
-            if(nexttc) nexttc->reqvel = 0.0;
-        }
+        bool ready = tpHandleAbort(tp, tc, nexttc, &spindle_status);
+        if (!ready) return 0;
     }
+    
+    tpCheckWaiting(tc, &spindle_status);
 
-    // this is no longer the segment we were waiting_for_index for
-    if (MOTION_ID_VALID(waiting_for_index) && waiting_for_index != tc->id) 
-    {
-        rtapi_print_msg(RTAPI_MSG_ERR,
-                "Was waiting for index on motion id %d, but reached id %d\n",
-                waiting_for_index, tc->id);
-        waiting_for_index = MOTION_INVALID_ID;
-    }
-    if (MOTION_ID_VALID(waiting_for_atspeed) && waiting_for_atspeed != tc->id)  
-    {
-
-        rtapi_print_msg(RTAPI_MSG_ERR,
-                "Was waiting for atspeed on motion id %d, but reached id %d\n",
-                waiting_for_atspeed, tc->id);
-        waiting_for_atspeed = MOTION_INVALID_ID;
-    }
-
+    // FIXME: roll this into tpCheckWaiting and return an error code?
     // check for at-speed before marking the tc active
-    if (MOTION_ID_VALID(waiting_for_atspeed)) {
+    if (MOTION_ID_VALID(spindle_status.waiting_for_atspeed)) {
         if(!emcmotStatus->spindle_is_atspeed) {
             /* spindle is still not at the right speed: wait */
             return 0;
         } else {
-            waiting_for_atspeed = MOTION_INVALID_ID;
+            spindle_status.waiting_for_atspeed = MOTION_INVALID_ID;
         }
     }
 
     //TODO refactor
     if(tc->active == 0) {
-        // this means this tc is being read for the first time.
-
-        // wait for atspeed, if motion requested it.  also, force
-        // atspeed check for the start of all spindle synchronized
-        // moves.
-        bool needs_atspeed = tc->atspeed || 
-            (tc->synchronized && !tc->velocity_mode && !emcmotStatus->spindleSync);
-        if( needs_atspeed && !(emcmotStatus->spindle_is_atspeed)) {
-            waiting_for_atspeed = tc->id;
-            return 0;
-        }
-
-        if (tc->indexrotary != -1) {
-            // request that the axis unlock
-            tpSetRotaryUnlock(tc->indexrotary, 1);
-            // if it is unlocked, fall through and start the move.
-            // otherwise, just come back later and check again
-            if (!tpGetRotaryIsUnlocked(tc->indexrotary))
-                return 0;
-        }
-
-        rtapi_print("Activate tc id %d\n",tc->id);
-        tc->active = 1;
-        tc->currentvel = 0;
-        tp->depth = tp->activeDepth = 1;
-        tp->motionType = tc->canon_motion_type;
-        tc->blending = 0;
-
-        // honor accel constraint in case we happen to make an acute angle
-        // with the next segment.
-        // TODO better acceleration constraints?
-        if(tc->term_cond == TC_TERM_COND_BLEND) 
-            tc->maxaccel /= 2.0;
-
-        if(tc->synchronized) {
-            if(!tc->velocity_mode && !emcmotStatus->spindleSync) {
-                // if we aren't already synced, wait
-                waiting_for_index = tc->id;
-                // ask for an index reset
-                emcmotStatus->spindle_index_enable = 1;
-                spindleoffset = 0.0;
-                // don't move: wait
-                return 0;
-            }
-        }
+        bool ready = tpActivateSegment(tp, tc, emcmotStatus, &spindle_status);
+        // Need to wait to continue motion, end planning here
+        if (!ready) return 0;
     }
 
-    if (MOTION_ID_VALID(waiting_for_index)) {
+    if (MOTION_ID_VALID(spindle_status.waiting_for_index)) {
         if(emcmotStatus->spindle_index_enable) {
             /* haven't passed index yet */
             return 0;
         } else {
             /* passed index, start the move */
             emcmotStatus->spindleSync = 1;
-            waiting_for_index = MOTION_INVALID_ID;
+            spindle_status.waiting_for_index = MOTION_INVALID_ID;
             tc->sync_accel=1;
-            revs=0;
+            spindle_status.revs=0;
         }
     }
         
-    if (tc->motion_type == TC_RIGIDTAP) tpHandleRigidTap(emcmotStatus,tc,spindleoffset);
+    if (tc->motion_type == TC_RIGIDTAP) tpHandleRigidTap(emcmotStatus, tc, &spindle_status);
 
     if(!tc->synchronized) emcmotStatus->spindleSync = 0;
 
@@ -1221,7 +1293,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     //TODO: refactor into tcUpdateSynchronized?
     if(tc->synchronized) {
         double pos_error;
-        double oldrevs = revs;
+        double oldrevs = spindle_status.revs;
 
         if(tc->velocity_mode) {
             pos_error = fabs(emcmotStatus->spindleSpeedIn) * tc->uu_per_rev;
@@ -1238,22 +1310,22 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             if(tc->motion_type == TC_RIGIDTAP && 
                     (tc->coords.rigidtap.state == RETRACTION || 
                      tc->coords.rigidtap.state == FINAL_REVERSAL))
-                revs = tc->coords.rigidtap.spindlerevs_at_reversal - 
+                spindle_status.revs = tc->coords.rigidtap.spindlerevs_at_reversal - 
                     new_spindlepos;
             else
-                revs = new_spindlepos;
+                spindle_status.revs = new_spindlepos;
 
-            pos_error = (revs - spindleoffset) * tc->uu_per_rev - tc->progress;
+            pos_error = (spindle_status.revs - spindle_status.offset) * tc->uu_per_rev - tc->progress;
             if(nexttc) pos_error -= nexttc->progress;
 
             if(tc->sync_accel) {
                 // detect when velocities match, and move the target accordingly.
                 // acceleration will abruptly stop and we will be on our new target.
-                spindle_vel = revs/(tc->cycle_time * tc->sync_accel++);
+                spindle_vel = spindle_status.revs/(tc->cycle_time * tc->sync_accel++);
                 target_vel = spindle_vel * tc->uu_per_rev;
                 if(tc->currentvel >= target_vel) {
                     // move target so as to drive pos_error to 0 next cycle
-                    spindleoffset = revs - tc->progress/tc->uu_per_rev;
+                    spindle_status.offset = spindle_status.revs - tc->progress/tc->uu_per_rev;
                     tc->sync_accel = 0;
                     tc->reqvel = target_vel;
                 } else {
@@ -1264,7 +1336,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                 // we have synced the beginning of the move as best we can -
                 // track position (minimize pos_error).
                 double errorvel;
-                spindle_vel = (revs - oldrevs) / tc->cycle_time;
+                spindle_vel = (spindle_status.revs - oldrevs) / tc->cycle_time;
                 target_vel = spindle_vel * tc->uu_per_rev;
                 errorvel = pmSqrt(fabs(pos_error) * tc->maxaccel);
                 if(pos_error<0) errorvel = -errorvel;
@@ -1317,49 +1389,42 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     bool is_blend_start = (tc->term_cond == TC_TERM_COND_BLEND ) && nexttc && on_final_decel && (primary_vel < tc->blend_vel);
 
     bool is_tangent_blend_start = (tc->term_cond == TC_TERM_COND_TANGENT ) && nexttc && tc->target==tc->progress;
+
     if (is_blend_start) tc->blending = 1;
 
     if(tc->blending && nexttc ) {
         // hack to show blends in axis
         tp->motionType = 0;
 
-        tpUpdateBlendStatus(tp, emcmotStatus, tc, nexttc, &target);
         secondary_before = tcGetPos(nexttc);
         
         tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
         tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
 
+        //Add in contributions from both segments
         tpUpdatePosition(tp,&secondary_displacement);
         tpUpdatePosition(tp,&primary_displacement);
 
+        if(tc->currentvel > nexttc->currentvel) tpUpdateMovementStatus(tp, tc, emcmotStatus);
+        else {
+            tpToggleDIOs(nexttc);
+            tpUpdateMovementStatus(tp, nexttc, emcmotStatus);
+        }
+
+        //Update velocity status based on both tc and nexttc
+        emcmotStatus->current_vel = tc->currentvel + nexttc->currentvel;
+
     } 
     else {
+        
         if (is_tangent_blend_start){
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
             tpUpdatePosition(tp,&secondary_displacement);
         }
         tpToggleDIOs(tc); //check and do DIO changes
-        target = tcGetEndpoint(tc);
-        tp->motionType = tc->canon_motion_type;
-        emcmotStatus->distance_to_go = tc->target - tc->progress;
-        emcmotStatus->current_vel = tc->currentvel;
-        emcmotStatus->requested_vel = tc->reqvel;
-        emcmotStatus->enables_queued = tc->enables;
-        // report our line number to the guis
-        tp->execId = tc->id;
         tpUpdatePosition(tp,&primary_displacement);
+        tpUpdateMovementStatus(tp, tc, emcmotStatus);
     }
-
-
-    emcmotStatus->dtg.tran.x = target.tran.x - tp->currentPos.tran.x;
-    emcmotStatus->dtg.tran.y = target.tran.y - tp->currentPos.tran.y;
-    emcmotStatus->dtg.tran.z = target.tran.z - tp->currentPos.tran.z;
-    emcmotStatus->dtg.a = target.a - tp->currentPos.a;
-    emcmotStatus->dtg.b = target.b - tp->currentPos.b;
-    emcmotStatus->dtg.c = target.c - tp->currentPos.c;
-    emcmotStatus->dtg.u = target.u - tp->currentPos.u;
-    emcmotStatus->dtg.v = target.v - tp->currentPos.v;
-    emcmotStatus->dtg.w = target.w - tp->currentPos.w;
 
     return 0;
 }

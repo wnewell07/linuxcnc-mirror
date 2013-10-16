@@ -27,6 +27,12 @@
 #define TP_VEL_EPSILON 1e-6
 #define TP_ACCEL_EPSILON 1e-6
 
+
+/**
+ * Trajectory planner state structure.
+ * Stores persistant data for the trajectory planner that should be accessible
+ * by outside functions.
+ */
 typedef struct {
     TC_QUEUE_STRUCT queue;
     int queueSize;
@@ -59,6 +65,19 @@ typedef struct {
 				   FALSE if in position mode */
     double uu_per_rev;          /* user units per spindle revolution */
 } TP_STRUCT;
+
+
+/**
+ * Persistant data for spindle status within tpRunCycle.
+ * This structure encapsulates some static variables to simplify refactoring of
+ * synchronized motion code.
+ */
+typedef struct {
+     double offset;
+     int waiting_for_index;
+     int waiting_for_atspeed;
+     double revs;
+} tp_spindle_status_t;
 
 extern int tpCreate(TP_STRUCT * tp, int _queueSize, TC_STRUCT * tcSpace);
 extern int tpClear(TP_STRUCT * tp);
