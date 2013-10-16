@@ -22,6 +22,9 @@
 #include "../motion/mot_priv.h"
 #include "motion_debug.h"
 
+#define debug(M, ...) rtapi_print("DEBUG %s:%d: " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#define debug_ping() debug("");
+
 extern emcmot_status_t *emcmotStatus;
 extern emcmot_debug_t *emcmotDebug;
 
@@ -752,10 +755,10 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
     if (newvel < 0.0) {
         //If we're not hitting a tangent move, then we need to throw out any overshoot to force an exact stop.
         //FIXME this means a momentary spike in acceleration, test to see if it's a problem
-        newvel = maxnewvel = 0.0;
+        newvel = newaccel = 0.0;
 
         if ( !(tc->term_cond == TC_TERM_COND_TANGENT) ) {
-            rtapi_print("goal between timesteps, calculated T-P = %f\n", tc->target-tc->progress);
+            debug("calculated newvel = %f, with T = %f, P = %f", newvel,tc->target,tc->progress);
             tc->progress = tc->target;
         }
     }
@@ -783,7 +786,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
         tc->currentvel = newvel;
     }
-    /*rtapi_print("tcRunCycle: desc = %f, v = %f,dtg = %f, vf = %f\n",discr, newvel, tc->target-tc->progress, final_vel);*/
+    debug("TC result: v = %f,dtg = %f, vf = %f, T = %f, P = %f", newvel, tc->target-tc->progress, final_vel,tc->target,tc->progress);
 
     if (v) *v = newvel;
     if (on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
@@ -820,6 +823,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
 
     switch (tc->coords.rigidtap.state) {
         case TAPPING:
+            debug("TAPPING");
             if (tc->progress >= tc->coords.rigidtap.reversal_target) {
                 // command reversal
                 emcmotStatus->spindle.speed *= -1;
@@ -827,6 +831,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
             }
             break;
         case REVERSING:
+            debug("REVERSING");
             if (new_spindlepos < old_spindlepos) {
                 PmPose start, end;
                 PmLine *aux = &tc->coords.rigidtap.aux_xyz;
@@ -836,21 +841,26 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
                 pmLinePoint(&tc->coords.rigidtap.xyz, tc->progress, &start);
                 end = tc->coords.rigidtap.xyz.start;
                 pmLineInit(aux, start, end);
+                debug("old target = %d",tc->target);
                 tc->coords.rigidtap.reversal_target = aux->tmag;
                 tc->target = aux->tmag + 10. * tc->uu_per_rev;
                 tc->progress = 0.0;
+                debug("new target = %d",tc->target);
 
                 tc->coords.rigidtap.state = RETRACTION;
             }
             old_spindlepos = new_spindlepos;
+            debug("Spindlepos = %f",new_spindlepos);
             break;
         case RETRACTION:
+            debug("RETRACTION");
             if (tc->progress >= tc->coords.rigidtap.reversal_target) {
                 emcmotStatus->spindle.speed *= -1;
                 tc->coords.rigidtap.state = FINAL_REVERSAL;
             }
             break;
         case FINAL_REVERSAL:
+            debug("FINAL_REVERSAL");
             if (new_spindlepos > old_spindlepos) {
                 PmPose start, end;
                 PmLine *aux = &tc->coords.rigidtap.aux_xyz;
@@ -868,6 +878,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
             old_spindlepos = new_spindlepos;
             break;
         case FINAL_PLACEMENT:
+            rtapi_print("FINAL_PLACEMENT\n");
             // this is a regular move now, it'll stop at target above.
             break;
     }
@@ -1022,7 +1033,7 @@ static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_sta
     tcqRemove(&tp->queue, 1);
 
     // so get next move
-    tc = tcqItem(&tp->queue, 0, 0.0);
+    tc = tcqItem(&tp->queue, 0);
     
     if(!tc) return 0;
     else {
@@ -1140,6 +1151,7 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
             // ask for an index reset
             emcmotStatus->spindle_index_enable = 1;
             status->offset = 0.0;
+            rtapi_print("Waiting on sync...\n");
             // don't move: wait
             return 0;
         }
@@ -1200,7 +1212,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     emcmotStatus->requested_vel = 0.0;
     //Define TC as the "first" element in the queue
     //FIXME remove period field from this function
-    tc = tcqItem(&tp->queue, 0, period);
+    tc = tcqItem(&tp->queue, 0);
 
     if(!tc) {
         tpHandleEmptyQueue(tp,emcmotStatus);
@@ -1208,11 +1220,11 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     }
 
     if (tc->target == tc->progress && spindle_status.waiting_for_atspeed != tc->id) {
-        //FIXME is this kosher?
+        //FIXME Redo this refactoring? masks several exit conditions
         tc = tpCompleteSegment(tp, tc, &spindle_status);
         
         if (!tc) {
-            rtapi_print("  Early stop at tpCompleteSegment\n");
+            /*rtapi_print("  Early stop at tpCompleteSegment\n");*/
             return 0;
         }
     }
@@ -1220,7 +1232,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     // it's not an error if there isn't another one - we just don't
     // do blending.  This happens in MDI for instance.
     if(!emcmotDebug->stepping && tc->term_cond) 
-        nexttc = tcqItem(&tp->queue, 1, period);
+        nexttc = tcqItem(&tp->queue, 1);
     else
         nexttc = NULL;
 
@@ -1258,6 +1270,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     if (MOTION_ID_VALID(spindle_status.waiting_for_atspeed)) {
         if(!emcmotStatus->spindle_is_atspeed) {
             /* spindle is still not at the right speed: wait */
+            debug_ping();
             return 0;
         } else {
             spindle_status.waiting_for_atspeed = MOTION_INVALID_ID;
@@ -1269,8 +1282,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         bool ready = tpActivateSegment(tp, tc, emcmotStatus, &spindle_status);
         // Need to wait to continue motion, end planning here
         if (!ready) {
-
-            rtapi_print("  Early stop at tpActivateSegment?\n");
+            debug_ping();
             return 0;
         }
     }
@@ -1309,6 +1321,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     //TODO: refactor into tcUpdateSynchronized?
     if(tc->synchronized) {
+
         double pos_error;
         double oldrevs = spindle_status.revs;
 
@@ -1331,6 +1344,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                     new_spindlepos;
             else
                 spindle_status.revs = new_spindlepos;
+            debug("Spindle Revs = %f",spindle_status.revs);
 
             pos_error = (spindle_status.revs - spindle_status.offset) * tc->uu_per_rev - tc->progress;
             if(nexttc) pos_error -= nexttc->progress;
@@ -1371,6 +1385,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                 nexttc->feed_override = emcmotStatus->net_feed_scale;
             }
         }
+        debug("Req. Vel = %f",tc->reqvel);
     } 
     //Copy in feed rate overrides
     else {
