@@ -997,7 +997,7 @@ static int tpGetRotaryIsUnlocked(int axis) {
  * this move, then pop if off the queue and perform cleanup operations.
  * Finally, get the next move in the queue.
  */
-static int tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_status_t* status){
+static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_status_t* status){
     // if we're synced, and this move is ending, save the
     // spindle position so the next synced move can be in
     // the right place.
@@ -1028,7 +1028,7 @@ static int tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_status_t* 
     else {
         rtapi_print("Found next tc id %d\n",tc->id);
     }
-    return 1;
+    return tc;
 }
 
 static int tpHandleAbort(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, tp_spindle_status_t* status){
@@ -1189,8 +1189,6 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     EmcPose primary_before, primary_displacement;
     EmcPose secondary_before, secondary_displacement;
 
-    //Pose data used for updating emcmot status
-    EmcPose target;
     
     // Persistant spindle data for spindle-synchronized motion
     static tp_spindle_status_t spindle_status = {0.0,MOTION_INVALID_ID,
@@ -1210,8 +1208,13 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     }
 
     if (tc->target == tc->progress && spindle_status.waiting_for_atspeed != tc->id) {
-        bool ready = tpCompleteSegment(tp, tc, &spindle_status);
-        if (!ready) return 0;
+        //FIXME is this kosher?
+        tc = tpCompleteSegment(tp, tc, &spindle_status);
+        
+        if (!tc) {
+            rtapi_print("  Early stop at tpCompleteSegment\n");
+            return 0;
+        }
     }
     // now we have the active tc.  get the upcoming one, if there is one.
     // it's not an error if there isn't another one - we just don't
@@ -1241,7 +1244,11 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if(tp->aborting) {
         bool ready = tpHandleAbort(tp, tc, nexttc, &spindle_status);
-        if (!ready) return 0;
+        if (!ready){
+            return 0;
+
+            rtapi_print("  Early stop at tpHandleAbort?\n");
+        }
     }
     
     tpCheckWaiting(tc, &spindle_status);
@@ -1261,7 +1268,11 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     if(tc->active == 0) {
         bool ready = tpActivateSegment(tp, tc, emcmotStatus, &spindle_status);
         // Need to wait to continue motion, end planning here
-        if (!ready) return 0;
+        if (!ready) {
+
+            rtapi_print("  Early stop at tpActivateSegment?\n");
+            return 0;
+        }
     }
 
     if (MOTION_ID_VALID(spindle_status.waiting_for_index)) {
@@ -1426,7 +1437,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     else {
         
         if (is_tangent_blend_start){
-            rtapi_print("Found Tangency at %d\n",tc->id);
+            rtapi_print("Found Tangency at %d, T-P of tc is %f at_endpt = %d\n",
+                    tc->id,tc->target - tc->progress, tc->target == tc->progress);
+            
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
             tpUpdatePosition(tp,&secondary_displacement);
         }
