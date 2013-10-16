@@ -783,7 +783,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
         tc->currentvel = newvel;
     }
-    rtapi_print("tcRunCycle: desc = %f, v = %f,progress = %f, vf = %f\n",discr, newvel, tc->progress,final_vel);
+    rtapi_print("tcRunCycle: desc = %f, v = %f,dtg = %f, vf = %f\n",discr, newvel, tc->target-tc->progress, final_vel);
 
     if (v) *v = newvel;
     if (on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
@@ -1392,6 +1392,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if (is_blend_start) tc->blending = 1;
 
+    tpUpdatePosition(tp,&primary_displacement);
     if(tc->blending && nexttc ) {
         // hack to show blends in axis
         tp->motionType = 0;
@@ -1403,7 +1404,6 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
         //Add in contributions from both segments
         tpUpdatePosition(tp,&secondary_displacement);
-        tpUpdatePosition(tp,&primary_displacement);
 
         if(tc->currentvel > nexttc->currentvel) tpUpdateMovementStatus(tp, tc, emcmotStatus);
         else {
@@ -1422,7 +1422,6 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             tpUpdatePosition(tp,&secondary_displacement);
         }
         tpToggleDIOs(tc); //check and do DIO changes
-        tpUpdatePosition(tp,&primary_displacement);
         tpUpdateMovementStatus(tp, tc, emcmotStatus);
     }
 
