@@ -783,7 +783,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         tc->progress += (newvel + tc->currentvel) * 0.5 * tc->cycle_time;
         tc->currentvel = newvel;
     }
-    rtapi_print("tcRunCycle: desc = %f, v = %f,dtg = %f, vf = %f\n",discr, newvel, tc->target-tc->progress, final_vel);
+    /*rtapi_print("tcRunCycle: desc = %f, v = %f,dtg = %f, vf = %f\n",discr, newvel, tc->target-tc->progress, final_vel);*/
 
     if (v) *v = newvel;
     if (on_final_decel) *on_final_decel = fabs(maxnewvel - newvel) < 0.001;
@@ -998,33 +998,36 @@ static int tpGetRotaryIsUnlocked(int axis) {
  * Finally, get the next move in the queue.
  */
 static int tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_status_t* status){
-    if (tc->target == tc->progress && status->waiting_for_atspeed != tc->id) {
-        // if we're synced, and this move is ending, save the
-        // spindle position so the next synced move can be in
-        // the right place.
-        if(tc->synchronized)
-            status->offset += tc->target/tc->uu_per_rev;
-        else
-            status->offset = 0.0;
+    // if we're synced, and this move is ending, save the
+    // spindle position so the next synced move can be in
+    // the right place.
 
-        if(tc->indexrotary != -1) {
-            // this was an indexing move, so before we remove it we must
-            // relock the axis
-            tpSetRotaryUnlock(tc->indexrotary, 0);
-            // if it is now locked, fall through and remove the finished move.
-            // otherwise, just come back later and check again
-            if(tpGetRotaryIsUnlocked(tc->indexrotary))
-                return 0;
-        }
+    rtapi_print("Finished tc id %d\n",tc->id);
+    if(tc->synchronized)
+        status->offset += tc->target/tc->uu_per_rev;
+    else
+        status->offset = 0.0;
 
-        // done with this move
-        tcqRemove(&tp->queue, 1);
-
-        // so get next move
-        tc = tcqItem(&tp->queue, 0, 0.0);
-        if(!tc) return 0;
+    if(tc->indexrotary != -1) {
+        // this was an indexing move, so before we remove it we must
+        // relock the axis
+        tpSetRotaryUnlock(tc->indexrotary, 0);
+        // if it is now locked, fall through and remove the finished move.
+        // otherwise, just come back later and check again
+        if(tpGetRotaryIsUnlocked(tc->indexrotary))
+            return 0;
     }
-    //FIXME consistent error codes!
+
+    // done with this move
+    tcqRemove(&tp->queue, 1);
+
+    // so get next move
+    tc = tcqItem(&tp->queue, 0, 0.0);
+    
+    if(!tc) return 0;
+    else {
+        rtapi_print("Found next tc id %d\n",tc->id);
+    }
     return 1;
 }
 
@@ -1102,7 +1105,7 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
         (tc->synchronized && !(tc->velocity_mode) && !(emcmotStatus->spindleSync));
     if( needs_atspeed && !(emcmotStatus->spindle_is_atspeed)) {
         status->waiting_for_atspeed = tc->id;
-        return 1;
+        return 0;
     }
 
     if (tc->indexrotary != -1) {
@@ -1111,7 +1114,7 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
         // if it is unlocked, fall through and start the move.
         // otherwise, just come back later and check again
         if (!tpGetRotaryIsUnlocked(tc->indexrotary))
-            return 1;
+            return 0;
     }
 
     // Temporary debug message
@@ -1138,12 +1141,12 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
             emcmotStatus->spindle_index_enable = 1;
             status->offset = 0.0;
             // don't move: wait
-            return 1;
+            return 0;
         }
     }
 
     //Keep going:
-    return 0;
+    return 1;
 }
 
 
@@ -1165,7 +1168,7 @@ static void tcUpdateVelocityMode(TC_STRUCT* tc, TC_STRUCT* nexttc, double speed,
  * tp fields (depth, done, etc) have to be twiddled to communicate the status;
  * I think those are spelled out here correctly and I can't clean it up
  * without breaking the API that the TP presents to motion. It's not THAT bad
- * and in the interest of not touching stuff outside this directory, I'm going
+ Found next the interest of not touching stuff outside this directory, I'm going
  * to leave it for now.
  */
 int tpRunCycle(TP_STRUCT * tp, long period)
@@ -1206,7 +1209,10 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         return 0;
     }
 
-    tpCompleteSegment(tp, tc, &spindle_status);
+    if (tc->target == tc->progress && spindle_status.waiting_for_atspeed != tc->id) {
+        bool ready = tpCompleteSegment(tp, tc, &spindle_status);
+        if (!ready) return 0;
+    }
     // now we have the active tc.  get the upcoming one, if there is one.
     // it's not an error if there isn't another one - we just don't
     // do blending.  This happens in MDI for instance.
@@ -1277,7 +1283,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if(nexttc && nexttc->active == 0) {
         // this means this tc is being read for the first time.
-        rtapi_print("Activate nexttc id %d\n",tc->id);
+        rtapi_print("Activate nexttc id %d\n",nexttc->id);
         nexttc->currentvel = 0;
         tp->depth = tp->activeDepth = 1;
         nexttc->active = 1;
@@ -1354,7 +1360,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                 nexttc->feed_override = emcmotStatus->net_feed_scale;
             }
         }
-    } else {
+    } 
+    //Copy in feed rate overrides
+    else {
         tc->feed_override = emcmotStatus->net_feed_scale;
         if(nexttc) {
             nexttc->feed_override = emcmotStatus->net_feed_scale;
@@ -1418,6 +1426,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     else {
         
         if (is_tangent_blend_start){
+            rtapi_print("Found Tangency at %d\n",tc->id);
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
             tpUpdatePosition(tp,&secondary_displacement);
         }
