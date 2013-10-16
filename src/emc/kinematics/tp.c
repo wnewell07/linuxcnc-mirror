@@ -21,9 +21,7 @@
 #include "hal.h"
 #include "../motion/mot_priv.h"
 #include "motion_debug.h"
-
-#define debug(M, ...) rtapi_print("DEBUG %s:%d: " M "\n", __FILE__, __LINE__, ##__VA_ARGS__)
-#define debug_ping() debug("");
+#include "tp_debug.h"
 
 extern emcmot_status_t *emcmotStatus;
 extern emcmot_debug_t *emcmotDebug;
