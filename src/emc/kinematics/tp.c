@@ -482,10 +482,17 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.enables = enables;
     tc.indexrotary = indexrotary;
 
-    if (tc.term_cond == TC_TERM_COND_TANGENT){
-        tc.finalvel=tc.reqvel;//Assume single constant feed rate for speed test
+    TC_STRUCT* last_tc;
+    if (tcqLen(&tp->queue)>1)
+        last_tc=tcqItem(&(tp->queue),-1);
+    else last_tc=NULL;
+    //KLUDGE temporary hack to fake optimization from hand-tuned G-code
+    tc.finalvel=0.0;
+    if (last_tc && last_tc->term_cond == TC_TERM_COND_TANGENT){
+        if ( tc.reqvel < last_tc->reqvel) last_tc->finalvel=tc.reqvel; // Assume single constant feedrate for speed test
+        else last_tc->finalvel=last_tc->reqvel;
     }
-    else   tc.finalvel=0.0; //Dummy value for now
+
 
     if (syncdio.anychanged != 0) {
         tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -563,7 +570,8 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.target = helix_length;
     tc.progress = 0.0;
     tc.reqvel = vel;
-    tc.maxaccel = acc;
+    //Assume acceleration ratio of 1
+    tc.maxaccel = acc*0.7071;
     tc.feed_override = 0.0;
     tc.maxvel = ini_maxvel;
     tc.id = tp->nextId;
@@ -589,11 +597,17 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.enables = enables;
     tc.indexrotary = -1;
 
+    //TEMPORARY HACK
+    TC_STRUCT* last_tc;
+    if (tcqLen(&tp->queue)>1)
+        last_tc=tcqItem(&(tp->queue),-1);
+    else last_tc=NULL;
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
-    if (tc.term_cond == TC_TERM_COND_TANGENT){
-        tc.finalvel=tc.reqvel; // Assume single constant feedrate for speed test
+    tc.finalvel=0.0;
+    if (last_tc && last_tc->term_cond == TC_TERM_COND_TANGENT){
+        if ( tc.reqvel < last_tc->reqvel) last_tc->finalvel=tc.reqvel; // Assume single constant feedrate for speed test
+        else last_tc->finalvel=last_tc->reqvel;
     }
-    else   tc.finalvel=0.0; //Dummy value for now
 
     if (syncdio.anychanged != 0) {
         tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -750,12 +764,12 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
     if (newvel > req_vel) newvel = req_vel;
 
-    if (newvel < 0.0) {
+    if (newvel < 0.0 ) {
         //If we're not hitting a tangent move, then we need to throw out any overshoot to force an exact stop.
         //FIXME this means a momentary spike in acceleration, test to see if it's a problem
         newvel = newaccel = 0.0;
 
-        if ( !(tc->term_cond == TC_TERM_COND_TANGENT) ) {
+        if ( !(tc->term_cond == TC_TERM_COND_TANGENT) || (tc->progress < tc->target ) ) {
             debug("calculated newvel = %f, with T = %f, P = %f", newvel,tc->target,tc->progress);
             tc->progress = tc->target;
         }

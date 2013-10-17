@@ -362,10 +362,13 @@ int tcqLen(TC_QUEUE_STRUCT * tcq)
 TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n)
 {
     TC_STRUCT *t;
+    //HACK: added negative indexing because of the mod function
     if ((0 == tcq) || (0 == tcq->queue) ||	/* not initialized */
-	(n < 0) || (n >= tcq->_len)) {	/* n too large */
+	(n <= -tcq->_len) || (n >= tcq->_len)) {	/* n too large */
 	return (TC_STRUCT *) 0;
     }
+    if (n<0) n=tcq->_len-n;
+
     t = &(tcq->queue[(tcq->start + n) % tcq->size]);
     return t;
 }
