@@ -385,7 +385,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     tc.enables = enables;
     tc.indexrotary = -1;
 
-    tc.finalvel=0.0; //Dummy value for now
+    tc.finalvel=0.0;
 
     if (syncdio.anychanged != 0) {
         tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -483,7 +483,7 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.indexrotary = indexrotary;
 
     if (tc.term_cond == TC_TERM_COND_TANGENT){
-        tc.finalvel=tc.reqvel/2.0;
+        tc.finalvel=tc.reqvel;//Assume single constant feed rate for speed test
     }
     else   tc.finalvel=0.0; //Dummy value for now
 
@@ -591,7 +591,7 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
 
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
     if (tc.term_cond == TC_TERM_COND_TANGENT){
-        tc.finalvel=tc.reqvel/2.0;
+        tc.finalvel=tc.reqvel; // Assume single constant feedrate for speed test
     }
     else   tc.finalvel=0.0; //Dummy value for now
 
