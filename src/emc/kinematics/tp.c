@@ -21,7 +21,11 @@
 #include "hal.h"
 #include "../motion/mot_priv.h"
 #include "motion_debug.h"
+
+//FIXME Roll this into RTAPI debug statements
+#define TP_DEBUG_OUTPUT
 #include "tp_debug.h"
+
 
 extern emcmot_status_t *emcmotStatus;
 extern emcmot_debug_t *emcmotDebug;
@@ -647,18 +651,21 @@ static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary
  * safe blend velocity is based on the known trajectory parameters. This
  * function updates the TC_STRUCT data with a safe blend velocity.
  */
-static void tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
+static double tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
+
+    //Store local blend velocity copy
+    double blend_vel=tc->blend_vel;
 
     if(nexttc && nexttc->maxaccel) {
-        tc->blend_vel = nexttc->maxaccel * 
+            blend_vel = nexttc->maxaccel * 
             pmSqrt(nexttc->target / nexttc->maxaccel);
-        if(tc->blend_vel > nexttc->reqvel * nexttc->feed_override) {
+        if(blend_vel > nexttc->reqvel * nexttc->feed_override) {
             // segment has a cruise phase so let's blend over the 
             // whole accel period if possible
-            tc->blend_vel = nexttc->reqvel * nexttc->feed_override;
+            blend_vel = nexttc->reqvel * nexttc->feed_override;
         }
         if(tc->maxaccel < nexttc->maxaccel)
-            tc->blend_vel *= tc->maxaccel/nexttc->maxaccel;
+            blend_vel *= tc->maxaccel/nexttc->maxaccel;
 
         if(tc->tolerance) {
             /* see diagram blend.fig.  T (blend tolerance) is given, theta
@@ -687,11 +694,12 @@ static void tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
             theta = acos(-dot)/2.0; 
             if(cos(theta) > 0.001) {
                 tblend_vel = 2.0 * pmSqrt(tc->maxaccel * tc->tolerance / cos(theta));
-                if(tblend_vel < tc->blend_vel)
-                    tc->blend_vel = tblend_vel;
+                if(tblend_vel < blend_vel)
+                    blend_vel = tblend_vel;
             }
         }
     }
+    return blend_vel;
     /*rtapi_print("Blend vel of id %d is %f\n",tc->id,tc->blend_vel);*/
 }
 
@@ -839,11 +847,11 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
                 pmLinePoint(&tc->coords.rigidtap.xyz, tc->progress, &start);
                 end = tc->coords.rigidtap.xyz.start;
                 pmLineInit(aux, start, end);
-                debug("old target = %d",tc->target);
+                debug("old target = %f",tc->target);
                 tc->coords.rigidtap.reversal_target = aux->tmag;
                 tc->target = aux->tmag + 10. * tc->uu_per_rev;
                 tc->progress = 0.0;
-                debug("new target = %d",tc->target);
+                debug("new target = %f",tc->target);
 
                 tc->coords.rigidtap.state = RETRACTION;
             }
@@ -876,7 +884,7 @@ static void tpHandleRigidTap(emcmot_status_t* emcmotStatus,TC_STRUCT* tc, tp_spi
             old_spindlepos = new_spindlepos;
             break;
         case FINAL_PLACEMENT:
-            rtapi_print("FINAL_PLACEMENT\n");
+            debug("FINAL_PLACEMENT\n");
             // this is a regular move now, it'll stop at target above.
             break;
     }
@@ -931,11 +939,12 @@ static void tpDoParabolicBlend(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, 
 
 }
 
-/*static void tpDoTangentBlend(TC_STRUCT* nexttc,EmcPose secondary_before,EmcPose* secondary_displacement){*/
-/*}*/
 
 /**
- * Calculate the displacement between a previous pose and current tc position.
+ * Calculate the displacement between a previous pose and the current tc position.
+ * This function encapsulates the simple but verbose displacement calculation
+ * based on an initial position. Because of the blending method, we need to use
+ * displacement instead of absolute position when blending between moves.
  */
 static void tpFindDisplacement(TC_STRUCT* tc, EmcPose before, EmcPose* displacement){
 
@@ -1011,7 +1020,7 @@ static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_sta
     // spindle position so the next synced move can be in
     // the right place.
 
-    rtapi_print("Finished tc id %d\n",tc->id);
+    debug("Finished tc id %d",tc->id);
     if(tc->synchronized)
         status->offset += tc->target/tc->uu_per_rev;
     else
@@ -1024,7 +1033,7 @@ static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_sta
         // if it is now locked, fall through and remove the finished move.
         // otherwise, just come back later and check again
         if(tpGetRotaryIsUnlocked(tc->indexrotary))
-            return 0;
+            return NULL;
     }
 
     // done with this move
@@ -1033,10 +1042,9 @@ static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_sta
     // so get next move
     tc = tcqItem(&tp->queue, 0);
     
-    if(!tc) return 0;
-    else {
-        rtapi_print("Found next tc id %d\n",tc->id);
-    }
+    if(!tc) return NULL;
+
+    debug("Found next tc id %d\n",tc->id);
     return tc;
 }
 
@@ -1077,7 +1085,7 @@ static int tpHandleAbort(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, tp_spi
  * waiting in the current segment instead. (Rob's understanding)
  */
 static int tpCheckWaiting(TC_STRUCT* tc, tp_spindle_status_t* status){
-
+    
     // this is no longer the segment we were waiting_for_index for
     if (MOTION_ID_VALID(status->waiting_for_index) && status->waiting_for_index != tc->id) 
     {
@@ -1086,6 +1094,7 @@ static int tpCheckWaiting(TC_STRUCT* tc, tp_spindle_status_t* status){
                 status->waiting_for_index, tc->id);
         status->waiting_for_index = MOTION_INVALID_ID;
     }
+
     if (MOTION_ID_VALID(status->waiting_for_atspeed) && status->waiting_for_atspeed != tc->id)  
     {
 
@@ -1094,8 +1103,54 @@ static int tpCheckWaiting(TC_STRUCT* tc, tp_spindle_status_t* status){
                 status->waiting_for_atspeed, tc->id);
         status->waiting_for_atspeed = MOTION_INVALID_ID;
     }
-    //FIXME implement error code if need be later
+
+    if (MOTION_ID_VALID(status->waiting_for_atspeed)) {
+        if(!emcmotStatus->spindle_is_atspeed) {
+            // spindle is still not at the right speed, so wait another cycle
+            return 1;
+        } else {
+            status->waiting_for_atspeed = MOTION_INVALID_ID;
+        }
+    }
+
     return 0;
+}
+
+
+/**
+ * Get a pointer to nexttc if we can, based on conditions.
+ * Once an active TC is created in the planner, we want to know the nexttc if
+ * we can get it. it's not an error if nexttc is missing (like in the MDI, or
+ * at the end of a path).
+ */
+static TC_STRUCT* tpGetNextTC(TP_STRUCT* tp, TC_STRUCT* tc,int stepping){
+    TC_STRUCT* nexttc = NULL;
+
+    if(!stepping && tc->term_cond) 
+        nexttc = tcqItem(&tp->queue, 1);
+    else
+        nexttc = NULL;
+
+    int this_synch_pos = tc->synchronized && !tc->velocity_mode;
+    int next_synch_pos = nexttc && nexttc->synchronized && !nexttc->velocity_mode;
+    if(!this_synch_pos && next_synch_pos) {
+        // we'll have to wait for spindle sync; might as well
+        // stop at the right place (don't blend)
+        tc->term_cond = TC_TERM_COND_STOP;
+        nexttc = NULL;
+    }
+
+    if(nexttc && nexttc->atspeed) {
+        // we'll have to wait for the spindle to be at-speed; might as well
+        // stop at the right place (don't blend), like above
+        // FIXME change the values so that 0 is exact stop mode
+        tc->term_cond = 0;
+        nexttc = NULL;
+    }
+
+    //TODO rest of nexttc here
+
+    return nexttc;
 }
 
 
@@ -1160,15 +1215,60 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
 }
 
 
-static void tcUpdateVelocityMode(TC_STRUCT* tc, TC_STRUCT* nexttc, double speed,
-        double net_feed_scale) {
+static void tcSyncVelocityMode(TC_STRUCT* tc, TC_STRUCT* nexttc, double speed) {
     //NOTE: check for aborting outside of here
 
     double pos_error = fabs(speed) * tc->uu_per_rev;
     //Take into account blending?
     if(nexttc) pos_error -= nexttc->progress; /* ?? */
-    tc->feed_override = net_feed_scale;
     tc->reqvel = pos_error;
+}
+
+
+static void tcSyncPositionMode(TC_STRUCT* tc, TC_STRUCT* nexttc,
+        tp_spindle_status_t* status, double spindle_pos) {
+
+    double spindle_vel, target_vel;
+    double oldrevs = status->revs;
+
+    /*double new_spindlepos = emcmotStatus->spindleRevs;*/
+
+    if(tc->motion_type == TC_RIGIDTAP && 
+            (tc->coords.rigidtap.state == RETRACTION || 
+             tc->coords.rigidtap.state == FINAL_REVERSAL))
+        status->revs = tc->coords.rigidtap.spindlerevs_at_reversal - 
+            spindle_pos;
+    else
+        status->revs = spindle_pos;
+
+    double pos_error = (status->revs - status->offset) * tc->uu_per_rev - tc->progress;
+
+    if(nexttc) pos_error -= nexttc->progress;
+
+    if(tc->sync_accel) {
+        // detect when velocities match, and move the target accordingly.
+        // acceleration will abruptly stop and we will be on our new target.
+        spindle_vel = status->revs/(tc->cycle_time * tc->sync_accel++);
+        target_vel = spindle_vel * tc->uu_per_rev;
+        if(tc->currentvel >= target_vel) {
+            // move target so as to drive pos_error to 0 next cycle
+            status->offset = status->revs - tc->progress/tc->uu_per_rev;
+            tc->sync_accel = 0;
+            tc->reqvel = target_vel;
+        } else {
+            // beginning of move and we are behind: accel as fast as we can
+            tc->reqvel = tc->maxvel;
+        }
+    } else {
+        // we have synced the beginning of the move as best we can -
+        // track position (minimize pos_error).
+        double errorvel;
+        spindle_vel = (status->revs - oldrevs) / tc->cycle_time;
+        target_vel = spindle_vel * tc->uu_per_rev;
+        errorvel = pmSqrt(fabs(pos_error) * tc->maxaccel);
+        if(pos_error<0) errorvel = -errorvel;
+        tc->reqvel = target_vel + errorvel;
+    }
 }
 
 /**
@@ -1218,39 +1318,12 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     }
 
     if (tc->target == tc->progress && spindle_status.waiting_for_atspeed != tc->id) {
-        //FIXME Redo this refactoring? masks several exit conditions
+        //If we can't get a valid tc (end of move, waiting on spindle), we're done for now.
         tc = tpCompleteSegment(tp, tc, &spindle_status);
-        
-        if (!tc) {
-            /*rtapi_print("  Early stop at tpCompleteSegment\n");*/
-            return 0;
-        }
-    }
-    // now we have the active tc.  get the upcoming one, if there is one.
-    // it's not an error if there isn't another one - we just don't
-    // do blending.  This happens in MDI for instance.
-    if(!emcmotDebug->stepping && tc->term_cond) 
-        nexttc = tcqItem(&tp->queue, 1);
-    else
-        nexttc = NULL;
-
-    {
-        int this_synch_pos = tc->synchronized && !tc->velocity_mode;
-        int next_synch_pos = nexttc && nexttc->synchronized && !nexttc->velocity_mode;
-        if(!this_synch_pos && next_synch_pos) {
-            // we'll have to wait for spindle sync; might as well
-            // stop at the right place (don't blend)
-            tc->term_cond = TC_TERM_COND_STOP;
-            nexttc = NULL;
-        }
+        if (!tc)  return 0;
     }
 
-    if(nexttc && nexttc->atspeed) {
-        // we'll have to wait for the spindle to be at-speed; might as well
-        // stop at the right place (don't blend), like above
-        tc->term_cond = 0;
-        nexttc = NULL;
-    }
+    nexttc = tpGetNextTC(tp, tc, emcmotDebug->stepping);
 
     if(tp->aborting) {
         bool ready = tpHandleAbort(tp, tc, nexttc, &spindle_status);
@@ -1260,8 +1333,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             rtapi_print("  Early stop at tpHandleAbort?\n");
         }
     }
-    
-    tpCheckWaiting(tc, &spindle_status);
+
+    int tc_wait = tpCheckWaiting(tc, &spindle_status);
+    if (tc_wait) return 0;
 
     // FIXME: roll this into tpCheckWaiting and return an error code?
     // check for at-speed before marking the tc active
@@ -1317,65 +1391,29 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             nexttc->maxaccel /= 2.0;
     }
 
-    //TODO: refactor into tcUpdateSynchronized?
+     
+    /** If synchronized with spindle, calculate requested velocity to track spindle motion.*/
     if(tc->synchronized) {
 
-        double pos_error;
-        double oldrevs = spindle_status.revs;
-
+        //Update requested velocity based on tracking error and sync mode
         if(tc->velocity_mode) {
-            pos_error = fabs(emcmotStatus->spindleSpeedIn) * tc->uu_per_rev;
-            if(nexttc) pos_error -= nexttc->progress; /* ?? */
-            if(!tp->aborting) {
-                tc->feed_override = emcmotStatus->net_feed_scale;
-                tc->reqvel = pos_error;
-            }
+            tcSyncVelocityMode(tc, nexttc, emcmotStatus->spindleSpeedIn);
+            tc->feed_override = emcmotStatus->net_feed_scale;
         } else {
-            double spindle_vel, target_vel;
-            double new_spindlepos = emcmotStatus->spindleRevs;
-            if (emcmotStatus->spindle.direction < 0) new_spindlepos = -new_spindlepos;
+            //Find signed spindle position
+            double spindle_pos = emcmotStatus->spindleRevs;
+            if (emcmotStatus->spindle.direction < 0.0) spindle_pos*=-1.0;
 
-            if(tc->motion_type == TC_RIGIDTAP && 
-                    (tc->coords.rigidtap.state == RETRACTION || 
-                     tc->coords.rigidtap.state == FINAL_REVERSAL))
-                spindle_status.revs = tc->coords.rigidtap.spindlerevs_at_reversal - 
-                    new_spindlepos;
-            else
-                spindle_status.revs = new_spindlepos;
-            debug("Spindle Revs = %f",spindle_status.revs);
+            tcSyncPositionMode(tc, nexttc, &spindle_status, spindle_pos);
 
-            pos_error = (spindle_status.revs - spindle_status.offset) * tc->uu_per_rev - tc->progress;
-            if(nexttc) pos_error -= nexttc->progress;
-
-            if(tc->sync_accel) {
-                // detect when velocities match, and move the target accordingly.
-                // acceleration will abruptly stop and we will be on our new target.
-                spindle_vel = spindle_status.revs/(tc->cycle_time * tc->sync_accel++);
-                target_vel = spindle_vel * tc->uu_per_rev;
-                if(tc->currentvel >= target_vel) {
-                    // move target so as to drive pos_error to 0 next cycle
-                    spindle_status.offset = spindle_status.revs - tc->progress/tc->uu_per_rev;
-                    tc->sync_accel = 0;
-                    tc->reqvel = target_vel;
-                } else {
-                    // beginning of move and we are behind: accel as fast as we can
-                    tc->reqvel = tc->maxvel;
-                }
-            } else {
-                // we have synced the beginning of the move as best we can -
-                // track position (minimize pos_error).
-                double errorvel;
-                spindle_vel = (spindle_status.revs - oldrevs) / tc->cycle_time;
-                target_vel = spindle_vel * tc->uu_per_rev;
-                errorvel = pmSqrt(fabs(pos_error) * tc->maxaccel);
-                if(pos_error<0) errorvel = -errorvel;
-                tc->reqvel = target_vel + errorvel;
-            }
             tc->feed_override = 1.0;
         }
         if(tc->reqvel < 0.0) tc->reqvel = 0.0;
+
         if(nexttc) {
             if (nexttc->synchronized) {
+                //If the next move is synchronized too, then match it's
+                //requested velocity to the current move
                 nexttc->reqvel = tc->reqvel;
                 nexttc->feed_override = 1.0;
                 if(nexttc->reqvel < 0.0) nexttc->reqvel = 0.0;
@@ -1383,15 +1421,12 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                 nexttc->feed_override = emcmotStatus->net_feed_scale;
             }
         }
-        debug("Req. Vel = %f",tc->reqvel);
     } 
-    //Copy in feed rate overrides
     else {
         tc->feed_override = emcmotStatus->net_feed_scale;
-        if(nexttc) {
-            nexttc->feed_override = emcmotStatus->net_feed_scale;
-        }
+        if(nexttc) nexttc->feed_override = emcmotStatus->net_feed_scale;
     }
+
     /* handle pausing */
     if(tp->pausing && (!tc->synchronized || tc->velocity_mode)) {
         tc->feed_override = 0.0;
@@ -1400,7 +1435,9 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         }
     }
     
-    if (tc->term_cond == TC_TERM_COND_BLEND) tpComputeBlendVelocity(tc, nexttc);
+    if (tc->term_cond == TC_TERM_COND_BLEND){
+        tc->blend_vel = tpComputeBlendVelocity(tc, nexttc);
+    }
 
     primary_before = tcGetPos(tc);
 
