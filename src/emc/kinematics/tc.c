@@ -424,7 +424,7 @@ int tcqFull(TC_QUEUE_STRUCT * tcq)
 TC_STRUCT *tcqLast(TC_QUEUE_STRUCT * tcq)
 {
     if (tcqCheck(tcq)) return NULL;
-
-    return &(tcq->queue[(tcq->end) % tcq->size]);
+    if (tcq->end>0) return &(tcq->queue[(tcq->end-1) % tcq->size]);
+    else return NULL;
 }
 

@@ -490,9 +490,11 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
     tc.finalvel=0.0;
     if (last_tc && last_tc->term_cond == TC_TERM_COND_TANGENT){
+        debug("Previous reqvel = %f",last_tc->reqvel);
         if ( tc.reqvel < last_tc->reqvel) last_tc->finalvel=tc.reqvel; // Assume single constant feedrate for speed test
         else last_tc->finalvel=last_tc->reqvel;
     }
+    if (last_tc) debug("last_tc term = %d",last_tc->term_cond);
 
 
     if (syncdio.anychanged != 0) {
@@ -628,11 +630,12 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
  */
 static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary_before) {
     double overshoot=0.0;
+    //FIXME might be expensive to do this every time
+    *secondary_before = tcGetPos(nexttc);
     //Apply any overshoot to the next TC, and make sure its initial
     //velocity is the same. This gives C1 continuity at tangent blends.
     if (tc->progress > tc->target) {
         //Store previous position
-        *secondary_before = tcGetPos(nexttc);
         overshoot = tc->progress - tc->target;
         if (nexttc){
             nexttc->progress = overshoot;
@@ -738,6 +741,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
     if (req_vel > tc->maxvel) req_vel = tc->maxvel;
     //Clamp final velocity to the max velocity we can achieve
+
     if (final_vel > req_vel) final_vel = req_vel;
     // Need this to plan down to zero V
     if (tp->pausing) final_vel = 0.0;
@@ -1277,6 +1281,12 @@ static void tcSyncPositionMode(TC_STRUCT* tc, TC_STRUCT* nexttc,
     }
 }
 
+static inline double tpGetSignedSpindlePosition(emcmot_status_t* emcmotStatus) {
+    double spindle_pos = emcmotStatus->spindleRevs;
+    if (emcmotStatus->spindle.direction < 0.0) spindle_pos*=-1.0;
+    return spindle_pos;
+}
+
 /**
  * Calculate an updated goal position for the next timestep.
  * This is the brains of the operation. It's called every TRAJ period and is
@@ -1406,11 +1416,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             tcSyncVelocityMode(tc, nexttc, emcmotStatus->spindleSpeedIn);
             tc->feed_override = emcmotStatus->net_feed_scale;
         } else {
-            //Find signed spindle position
-            double spindle_pos = emcmotStatus->spindleRevs;
-            if (emcmotStatus->spindle.direction < 0.0) spindle_pos*=-1.0;
-
-            tcSyncPositionMode(tc, nexttc, &spindle_status, spindle_pos);
+            tcSyncPositionMode(tc, nexttc, &spindle_status,
+                    tpGetSignedSpindlePosition(emcmotStatus));
 
             tc->feed_override = 1.0;
         }
@@ -1454,6 +1461,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     //Update 
     tpFindDisplacement(tc,primary_before,&primary_displacement);
+    /*debug("Primary disp, X = %f,Y=%f,Z=%f",*/
+            /*primary_displacement.tran.x,primary_displacement.tran.y,primary_displacement.tran.z);*/
 
     // Update the trajectory planner position based on the results
 
@@ -1497,6 +1506,8 @@ int tpRunCycle(TP_STRUCT * tp, long period)
                     tc->id,tc->target - tc->progress, tc->target == tc->progress);
 
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
+            /*debug("Secondary disp, X = %f,Y=%f,Z=%f",*/
+                    /*secondary_displacement.tran.x,secondary_displacement.tran.y,secondary_displacement.tran.z);*/
             tpUpdatePosition(tp,&secondary_displacement);
         }
         tpToggleDIOs(tc); //check and do DIO changes
