@@ -296,8 +296,39 @@ int tpErrorCheck(TP_STRUCT *tp) {
 
 
 /**
+ * Initialize a new queue segment with common parameters.
+ * This function is mostly to save space in the tpAddXXX functions, since they
+ * get pretty long. If you need a custom setting, overwrite your particular
+ * field after calling this function.
+ */
+static inline void tpInitializeNewSegment(TP_STRUCT* tp, TC_STRUCT* tc,double
+        vel, double ini_maxvel, double acc, unsigned char enables){
+
+    tc->sync_accel = 0;
+    tc->cycle_time = tp->cycleTime;
+
+    tc->progress = 0.0;
+    tc->reqvel = vel;
+    tc->maxaccel = acc;
+    tc->feed_override = 0.0;
+    tc->maxvel = ini_maxvel;
+    tc->id = tp->nextId;
+    tc->active = 0;
+
+    tc->currentvel = 0.0;
+    tc->blending = 0;
+    tc->blend_vel = 0.0;
+    tc->vel_at_blend_start = 0.0;
+    tc->finalvel = 0.0;
+
+    tc->enables=enables;
+
+}
+
+/**
  * Add a newly created motion segment to the tp queue.
- * Returns an error code if the queue operation fails.
+ * Returns an error code if the queue operation fails, otherwise adds a new
+ * segment to the queue and updates the end point of the trajectory planner.
  */
 static inline int tpAddSegmentToQueue(TP_STRUCT* tp, TC_STRUCT tc, EmcPose end){
 
@@ -345,26 +376,14 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
 
     pmLineInit(&line_xyz, start_xyz, end_xyz);
 
-    tc.sync_accel = 0;
-    tc.cycle_time = tp->cycleTime;
+    tpInitializeNewSegment(tp,&tc,vel,ini_maxvel,acc,enables);
+
     tc.coords.rigidtap.reversal_target = line_xyz.tmag;
 
     // allow 10 turns of the spindle to stop - we don't want to just go on forever
     tc.target = line_xyz.tmag + 10. * tp->uu_per_rev;
 
-    tc.progress = 0.0;
-    tc.reqvel = vel;
-    tc.maxaccel = acc;
-    tc.feed_override = 0.0;
-    tc.maxvel = ini_maxvel;
-    tc.id = tp->nextId;
-    tc.active = 0;
     tc.atspeed = 1;
-
-    tc.currentvel = 0.0;
-    tc.blending = 0;
-    tc.blend_vel = 0.0;
-    tc.vel_at_blend_start = 0.0;
 
     tc.coords.rigidtap.xyz = line_xyz;
     tc.coords.rigidtap.abc = abc;
@@ -383,10 +402,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
 
     tc.uu_per_rev = tp->uu_per_rev;
     tc.velocity_mode = tp->velocity_mode;
-    tc.enables = enables;
     tc.indexrotary = -1;
-
-    tc.finalvel=0.0;
 
     if (syncdio.anychanged != 0) {
         tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
@@ -443,8 +459,7 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     pmLineInit(&line_uvw, start_uvw, end_uvw);
     pmLineInit(&line_abc, start_abc, end_abc);
 
-    tc.sync_accel = 0;
-    tc.cycle_time = tp->cycleTime;
+    tpInitializeNewSegment(tp,&tc,vel,ini_maxvel,acc,enables);
 
     if (!line_xyz.tmag_zero) 
         tc.target = line_xyz.tmag;
@@ -453,19 +468,7 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     else
         tc.target = line_abc.tmag;
 
-    tc.progress = 0.0;
-    tc.reqvel = vel;
-    tc.maxaccel = acc;
-    tc.feed_override = 0.0;
-    tc.maxvel = ini_maxvel;
-    tc.id = tp->nextId;
-    tc.active = 0;
     tc.atspeed = atspeed;
-
-    tc.currentvel = 0.0;
-    tc.blending = 0;
-    tc.blend_vel = 0.0;
-    tc.vel_at_blend_start = 0.0;
 
     tc.coords.line.xyz = line_xyz;
     tc.coords.line.uvw = line_uvw;
@@ -479,16 +482,13 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.synchronized = tp->synchronized;
     tc.velocity_mode = tp->velocity_mode;
     tc.uu_per_rev = tp->uu_per_rev;
-    tc.enables = enables;
     tc.indexrotary = indexrotary;
-
 
     TC_STRUCT* last_tc;
     if (tcqLen(&tp->queue)>1)
         last_tc=tcqLast(&(tp->queue));
     else last_tc=NULL;
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
-    tc.finalvel=0.0;
     if (last_tc && last_tc->term_cond == TC_TERM_COND_TANGENT){
         debug("Previous reqvel = %f",last_tc->reqvel);
         if ( tc.reqvel < last_tc->reqvel) last_tc->finalvel=tc.reqvel; // Assume single constant feedrate for speed test
@@ -566,24 +566,12 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     pmCartMag(circle.rHelix, &helix_z_component);
     helix_length = pmSqrt(pmSq(circle.angle * circle.radius) +
             pmSq(helix_z_component));
+    tpInitializeNewSegment(tp,&tc,vel,ini_maxvel,acc,enables);
 
-    tc.sync_accel = 0;
-    tc.cycle_time = tp->cycleTime;
     tc.target = helix_length;
-    tc.progress = 0.0;
-    tc.reqvel = vel;
     //Assume acceleration ratio of 1
-    tc.maxaccel = acc*0.7071;
-    tc.feed_override = 0.0;
-    tc.maxvel = ini_maxvel;
-    tc.id = tp->nextId;
-    tc.active = 0;
     tc.atspeed = atspeed;
-
-    tc.currentvel = 0.0;
-    tc.blending = 0;
-    tc.blend_vel = 0.0;
-    tc.vel_at_blend_start = 0.0;
+    //TODO acceleration bounded by optimizer
 
     tc.coords.circle.xyz = circle;
     tc.coords.circle.uvw = line_uvw;
@@ -596,7 +584,6 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     tc.synchronized = tp->synchronized;
     tc.velocity_mode = tp->velocity_mode;
     tc.uu_per_rev = tp->uu_per_rev;
-    tc.enables = enables;
     tc.indexrotary = -1;
 
     //TEMPORARY HACK
@@ -605,7 +592,6 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
         last_tc=tcqLast(&(tp->queue));
     else last_tc=NULL;
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
-    tc.finalvel=0.0;
     if (last_tc && last_tc->term_cond == TC_TERM_COND_TANGENT){
         if ( tc.reqvel < last_tc->reqvel) last_tc->finalvel=tc.reqvel; // Assume single constant feedrate for speed test
         else last_tc->finalvel=last_tc->reqvel;
@@ -641,8 +627,8 @@ static void tpCheckOvershoot(TC_STRUCT* tc, TC_STRUCT* nexttc,EmcPose* secondary
             nexttc->progress = overshoot;
             nexttc->currentvel = tc->currentvel;
             tc->progress=tc->target;
-            rtapi_print("Overshot by %f at end of move %d\n",overshoot,tc->id);
-            rtapi_print("setting init vel to %f\n",nexttc->currentvel);
+            debug("Overshot by %f at end of move %d\n",overshoot,tc->id);
+            debug("setting init vel to %f\n",nexttc->currentvel);
         }
         else {
             //Kludge fix to see if we can catch the crash at the end of the dummy toolpath
@@ -709,7 +695,7 @@ static double tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
         }
     }
     return blend_vel;
-    /*rtapi_print("Blend vel of id %d is %f\n",tc->id,tc->blend_vel);*/
+    /*debug("Blend vel of id %d is %f\n",tc->id,tc->blend_vel);*/
 }
 
 /**
@@ -737,6 +723,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 
     // Find maximum allowed velocity from feed and machine limits
     double req_vel = tc->reqvel * tc->feed_override;
+    // Store a copy of final velocity since it has to change based on 
     double final_vel = tc->finalvel * tc->feed_override;
 
     if (req_vel > tc->maxvel) req_vel = tc->maxvel;
@@ -1192,7 +1179,7 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
     }
 
     // Temporary debug message
-    rtapi_print("Activate tc id %d\n",tc->id);
+    debug("Activate tc id %d\n",tc->id);
 
     tc->active = 1;
     tc->currentvel = 0;
@@ -1214,7 +1201,7 @@ static int tpActivateSegment(TP_STRUCT* tp, TC_STRUCT* tc, emcmot_status_t* emcm
             // ask for an index reset
             emcmotStatus->spindle_index_enable = 1;
             status->offset = 0.0;
-            rtapi_print("Waiting on sync...\n");
+            debug("Waiting on sync...\n");
             // don't move: wait
             return 0;
         }
@@ -1346,7 +1333,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         if (!ready){
             return 0;
 
-            rtapi_print("  Early stop at tpHandleAbort?\n");
+            debug("  Early stop at tpHandleAbort?\n");
         }
     }
 
@@ -1394,7 +1381,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     if(nexttc && nexttc->active == 0) {
         // this means this tc is being read for the first time.
-        rtapi_print("Activate nexttc id %d\n",nexttc->id);
+        debug("Activate nexttc id %d\n",nexttc->id);
         nexttc->currentvel = 0;
         tp->depth = tp->activeDepth = 1;
         nexttc->active = 1;
@@ -1502,7 +1489,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     else {
 
         if (is_tangent_blend_start){
-            rtapi_print("Found Tangency at %d, T-P of tc is %f at_endpt = %d\n",
+            debug("Found Tangency at %d, T-P of tc is %f at_endpt = %d\n",
                     tc->id,tc->target - tc->progress, tc->target == tc->progress);
 
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
