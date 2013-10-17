@@ -1,0 +1,7 @@
+G90 (set absolute mode)
+G61 (exact stop mode for initial tests)
+M3 S500
+G0 X1.000 Y1.000 Z0.100 (rapid move to starting position)
+G33.1 Z-0.750 K0.05 (rigid tap a 20 TPI thread 0.750 deep)
+M2 (end program)
+%

@@ -359,7 +359,7 @@ int tcqLen(TC_QUEUE_STRUCT * tcq)
  *
  * @return	 TC_STRUCT returns the TC elements
  */   
-TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n, long period)
+TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n)
 {
     TC_STRUCT *t;
     if ((0 == tcq) || (0 == tcq->queue) ||	/* not initialized */
