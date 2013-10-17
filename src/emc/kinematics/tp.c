@@ -293,11 +293,32 @@ int tpErrorCheck(TP_STRUCT *tp) {
     return 0;
 }
 
+
+/**
+ * Add a newly created motion segment to the tp queue.
+ * Returns an error code if the queue operation fails.
+ */
+static inline int tpAddSegmentToQueue(TP_STRUCT* tp, TC_STRUCT tc, EmcPose end){
+
+    if (tcqPut(&tp->queue, tc) == -1) {
+        rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
+        return -1;
+    }
+
+    tp->goalPos = end;      // remember the end of this move, as it's
+    // the start of the next one.
+    tp->done = 0;
+    tp->depth = tcqLen(&tp->queue);
+    tp->nextId++;
+
+    return 0;
+}
+
 /**
  * Adds a rigid tap cycle to the motion queue.
  */
 int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel, 
-                  double acc, unsigned char enables) {
+        double acc, unsigned char enables) {
     TC_STRUCT tc;
     PmLine line_xyz;
     PmPose start_xyz, end_xyz;
@@ -311,7 +332,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
 
     start_xyz.rot = identity_quat;
     end_xyz.rot = identity_quat;
-    
+
     // abc cannot move
     abc.x = tp->goalPos.a;
     abc.y = tp->goalPos.b;
@@ -358,7 +379,7 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
         return -1;
     }
     tc.synchronized = tp->synchronized;
-    
+
     tc.uu_per_rev = tp->uu_per_rev;
     tc.velocity_mode = tp->velocity_mode;
     tc.enables = enables;
@@ -373,19 +394,8 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
         tc.syncdio.anychanged = 0;
     }
 
-    if (tcqPut(&tp->queue, tc) == -1) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
-        return -1;
-    }
-    
-    // do not change tp->goalPos here,
-    // since this move will end just where it started
-
-    tp->done = 0;
-    tp->depth = tcqLen(&tp->queue);
-    tp->nextId++;
-
-    return 0;
+    //Assume non-zero error code is failure
+    return tpAddSegmentToQueue(tp,tc,end);
 }
 
 /**
@@ -471,33 +481,23 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.uu_per_rev = tp->uu_per_rev;
     tc.enables = enables;
     tc.indexrotary = indexrotary;
-    
-    //KLUDGE temporary hack to fake optimization from hand-tuned G-code
+
     if (tc.term_cond == TC_TERM_COND_TANGENT){
         tc.finalvel=tc.reqvel/2.0;
     }
     else   tc.finalvel=0.0; //Dummy value for now
 
     if (syncdio.anychanged != 0) {
-	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
-	tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
+        tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
+        tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
     } else {
-	tc.syncdio.anychanged = 0;
+        tc.syncdio.anychanged = 0;
     }
 
-    if (tcqPut(&tp->queue, tc) == -1) {
-        rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
-	return -1;
-    }
-
-    tp->goalPos = end;      // remember the end of this move, as it's
-                            // the start of the next one.
-    tp->done = 0;
-    tp->depth = tcqLen(&tp->queue);
-    tp->nextId++;
-
-    return 0;
+    //Assume non-zero error code is failure
+    return tpAddSegmentToQueue(tp,tc,end);
 }
+
 
 /**
  * Adds a circular (circle, arc, helix) move from the end of the
@@ -510,8 +510,8 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
  * xyz so the target is always the circle/arc/helical length.  
  */
 int tpAddCircle(TP_STRUCT * tp, EmcPose end,
-		PmCartesian center, PmCartesian normal, int turn, int type,
-                double vel, double ini_maxvel, double acc, unsigned char enables, char atspeed)
+        PmCartesian center, PmCartesian normal, int turn, int type,
+        double vel, double ini_maxvel, double acc, unsigned char enables, char atspeed)
 {
     TC_STRUCT tc;
     PmCircle circle;
@@ -556,7 +556,7 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     // find helix length
     pmCartMag(circle.rHelix, &helix_z_component);
     helix_length = pmSqrt(pmSq(circle.angle * circle.radius) +
-                          pmSq(helix_z_component));
+            pmSq(helix_z_component));
 
     tc.sync_accel = 0;
     tc.cycle_time = tp->cycleTime;
@@ -594,24 +594,16 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
         tc.finalvel=tc.reqvel/2.0;
     }
     else   tc.finalvel=0.0; //Dummy value for now
-    
+
     if (syncdio.anychanged != 0) {
-	tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
-	tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
+        tc.syncdio = syncdio; //enqueue the list of DIOs that need toggling
+        tpClearDIOs(); // clear out the list, in order to prepare for the next time we need to use it
     } else {
-	tc.syncdio.anychanged = 0;
+        tc.syncdio.anychanged = 0;
     }
 
-    if (tcqPut(&tp->queue, tc) == -1) {
-	return -1;
-    }
-
-    tp->goalPos = end;
-    tp->done = 0;
-    tp->depth = tcqLen(&tp->queue);
-    tp->nextId++;
-
-    return 0;
+    //Assume non-zero error code is failure
+    return tpAddSegmentToQueue(tp,tc,end);
 }
 
 /**
@@ -657,7 +649,7 @@ static double tpComputeBlendVelocity(TC_STRUCT* tc, TC_STRUCT* nexttc) {
     double blend_vel=tc->blend_vel;
 
     if(nexttc && nexttc->maxaccel) {
-            blend_vel = nexttc->maxaccel * 
+        blend_vel = nexttc->maxaccel * 
             pmSqrt(nexttc->target / nexttc->maxaccel);
         if(blend_vel > nexttc->reqvel * nexttc->feed_override) {
             // segment has a cruise phase so let's blend over the 
@@ -769,7 +761,7 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
         }
     }
     else {
-        
+
         bool is_pure_rotary = (tc->motion_type == TC_LINEAR) &&
             (tc->coords.line.xyz.tmag_zero) && (tc->coords.line.uvw.tmag_zero);
         bool is_position_synced = (!tc->synchronized) || tc->velocity_mode;
@@ -801,16 +793,16 @@ void tcRunCycle(TP_STRUCT *tp, TC_STRUCT *tc, double *v, int *on_final_decel) {
 void tpToggleDIOs(TC_STRUCT * tc) {
     int i=0;
     if (tc->syncdio.anychanged != 0) { // we have DIO's to turn on or off
-	for (i=0; i < num_dio; i++) {
+        for (i=0; i < num_dio; i++) {
             if (!(tc->syncdio.dio_mask & (1 << i))) continue;
-	    if (tc->syncdio.dios[i] > 0) emcmotDioWrite(i, 1); // turn DIO[i] on
-	    if (tc->syncdio.dios[i] < 0) emcmotDioWrite(i, 0); // turn DIO[i] off
-	}
-	for (i=0; i < num_aio; i++) {
-            if (!(tc->syncdio.aio_mask & (1 << i))) continue;
-	    emcmotAioWrite(i, tc->syncdio.aios[i]); // set AIO[i]
+            if (tc->syncdio.dios[i] > 0) emcmotDioWrite(i, 1); // turn DIO[i] on
+            if (tc->syncdio.dios[i] < 0) emcmotDioWrite(i, 0); // turn DIO[i] off
         }
-	tc->syncdio.anychanged = 0; //we have turned them all on/off, nothing else to do for this TC the next time
+        for (i=0; i < num_aio; i++) {
+            if (!(tc->syncdio.aio_mask & (1 << i))) continue;
+            emcmotAioWrite(i, tc->syncdio.aios[i]); // set AIO[i]
+        }
+        tc->syncdio.anychanged = 0; //we have turned them all on/off, nothing else to do for this TC the next time
     }
 }
 
@@ -1041,7 +1033,7 @@ static TC_STRUCT* tpCompleteSegment(TP_STRUCT* tp, TC_STRUCT* tc, tp_spindle_sta
 
     // so get next move
     tc = tcqItem(&tp->queue, 0);
-    
+
     if(!tc) return NULL;
 
     debug("Found next tc id %d\n",tc->id);
@@ -1085,7 +1077,7 @@ static int tpHandleAbort(TP_STRUCT* tp, TC_STRUCT* tc, TC_STRUCT* nexttc, tp_spi
  * waiting in the current segment instead. (Rob's understanding)
  */
 static int tpCheckWaiting(TC_STRUCT* tc, tp_spindle_status_t* status){
-    
+
     // this is no longer the segment we were waiting_for_index for
     if (MOTION_ID_VALID(status->waiting_for_index) && status->waiting_for_index != tc->id) 
     {
@@ -1299,7 +1291,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     EmcPose primary_before, primary_displacement;
     EmcPose secondary_before, secondary_displacement;
 
-    
+
     // Persistant spindle data for spindle-synchronized motion
     static tp_spindle_status_t spindle_status = {0.0,MOTION_INVALID_ID,
         MOTION_INVALID_ID,0.0};
@@ -1371,7 +1363,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             spindle_status.revs=0;
         }
     }
-        
+
     if (tc->motion_type == TC_RIGIDTAP) tpHandleRigidTap(emcmotStatus, tc, &spindle_status);
 
     if(!tc->synchronized) emcmotStatus->spindleSync = 0;
@@ -1391,7 +1383,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             nexttc->maxaccel /= 2.0;
     }
 
-     
+
     /** If synchronized with spindle, calculate requested velocity to track spindle motion.*/
     if(tc->synchronized) {
 
@@ -1434,7 +1426,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
             nexttc->feed_override = 0.0;
         }
     }
-    
+
     if (tc->term_cond == TC_TERM_COND_BLEND){
         tc->blend_vel = tpComputeBlendVelocity(tc, nexttc);
     }
@@ -1445,7 +1437,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
     tcRunCycle(tp, tc, &primary_vel, &on_final_decel);
     //If we've overshot the target, then fold this into the next move
     if (tc->term_cond == TC_TERM_COND_TANGENT) tpCheckOvershoot(tc,nexttc,&secondary_before);
-   
+
     //Update 
     tpFindDisplacement(tc,primary_before,&primary_displacement);
 
@@ -1467,7 +1459,7 @@ int tpRunCycle(TP_STRUCT * tp, long period)
         tp->motionType = 0;
 
         secondary_before = tcGetPos(nexttc);
-        
+
         tpDoParabolicBlend(tp, tc, nexttc, primary_vel);
         tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
 
@@ -1485,11 +1477,11 @@ int tpRunCycle(TP_STRUCT * tp, long period)
 
     } 
     else {
-        
+
         if (is_tangent_blend_start){
             rtapi_print("Found Tangency at %d, T-P of tc is %f at_endpt = %d\n",
                     tc->id,tc->target - tc->progress, tc->target == tc->progress);
-            
+
             tpFindDisplacement(nexttc,secondary_before,&secondary_displacement);
             tpUpdatePosition(tp,&secondary_displacement);
         }
@@ -1514,7 +1506,7 @@ int tpSetSpindleSync(TP_STRUCT * tp, double sync, int mode) {
 int tpPause(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
     tp->pausing = 1;
     return 0;
@@ -1523,7 +1515,7 @@ int tpPause(TP_STRUCT * tp)
 int tpResume(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
     tp->pausing = 0;
     return 0;
@@ -1532,13 +1524,13 @@ int tpResume(TP_STRUCT * tp)
 int tpAbort(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
 
     if (!tp->aborting) {
-	/* to abort, signal a pause and set our abort flag */
-	tpPause(tp);
-	tp->aborting = 1;
+        /* to abort, signal a pause and set our abort flag */
+        tpPause(tp);
+        tp->aborting = 1;
     }
     return tpClearDIOs(); //clears out any already cached DIOs
 }
@@ -1554,7 +1546,7 @@ EmcPose tpGetPos(TP_STRUCT * tp)
 
     if (0 == tp) {
         ZERO_EMC_POSE(retval);
-	return retval;
+        return retval;
     }
 
     return tp->currentPos;
@@ -1563,7 +1555,7 @@ EmcPose tpGetPos(TP_STRUCT * tp)
 int tpIsDone(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return 0;
+        return 0;
     }
 
     return tp->done;
@@ -1572,7 +1564,7 @@ int tpIsDone(TP_STRUCT * tp)
 int tpQueueDepth(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return 0;
+        return 0;
     }
 
     return tp->depth;
@@ -1581,7 +1573,7 @@ int tpQueueDepth(TP_STRUCT * tp)
 int tpActiveDepth(TP_STRUCT * tp)
 {
     if (0 == tp) {
-	return 0;
+        return 0;
     }
 
     return tp->activeDepth;
@@ -1589,7 +1581,7 @@ int tpActiveDepth(TP_STRUCT * tp)
 
 int tpSetAout(TP_STRUCT *tp, unsigned char index, double start, double end) {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
     syncdio.anychanged = 1; //something has changed
     syncdio.aio_mask |= (1 << index);
@@ -1599,14 +1591,14 @@ int tpSetAout(TP_STRUCT *tp, unsigned char index, double start, double end) {
 
 int tpSetDout(TP_STRUCT *tp, int index, unsigned char start, unsigned char end) {
     if (0 == tp) {
-	return -1;
+        return -1;
     }
     syncdio.anychanged = 1; //something has changed
     syncdio.dio_mask |= (1 << index);
     if (start > 0)
-	syncdio.dios[index] = 1; // the end value can't be set from canon currently, and has the same value as start
+        syncdio.dios[index] = 1; // the end value can't be set from canon currently, and has the same value as start
     else 
-	syncdio.dios[index] = -1;
+        syncdio.dios[index] = -1;
     return 0;    
 }
 

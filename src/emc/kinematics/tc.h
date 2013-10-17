@@ -21,6 +21,7 @@
 #include <stdbool.h>
 
 /* values for endFlag */
+#define TC_TERM_COND_NONE 0
 #define TC_TERM_COND_STOP 1
 //HACK temporarily swap flags to use G64 to enable tangent blends
 #define TC_TERM_COND_BLEND 3
