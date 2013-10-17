@@ -155,6 +155,12 @@ extern int tcqLen(TC_QUEUE_STRUCT * tcq);
 /* look at nth item, first is 0 */
 extern TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n);
 
+
+/**
+ * Get the "end" of the queue, the most recently added item.
+ */
+extern TC_STRUCT *tcqLast(TC_QUEUE_STRUCT * tcq);
+
 /* get full status */
 extern int tcqFull(TC_QUEUE_STRUCT * tcq);
 

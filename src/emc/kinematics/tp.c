@@ -32,6 +32,7 @@ extern emcmot_debug_t *emcmotDebug;
 
 int output_chan = 0;
 syncdio_t syncdio; //record tpSetDout's here
+const PmQuaternion IDENTITY_QUAT = { 1.0, 0.0, 0.0, 0.0 };
 
 /**
  * Create the trajectory planner structure with an empty queue.
@@ -314,6 +315,7 @@ static inline int tpAddSegmentToQueue(TP_STRUCT* tp, TC_STRUCT tc, EmcPose end){
     return 0;
 }
 
+
 /**
  * Adds a rigid tap cycle to the motion queue.
  */
@@ -323,15 +325,14 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     PmLine line_xyz;
     PmPose start_xyz, end_xyz;
     PmCartesian abc, uvw;
-    PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
     if (tpErrorCheck(tp)<0) return -1;
 
     start_xyz.tran = tp->goalPos.tran;
     end_xyz.tran = end.tran;
 
-    start_xyz.rot = identity_quat;
-    end_xyz.rot = identity_quat;
+    start_xyz.rot = IDENTITY_QUAT;
+    end_xyz.rot = IDENTITY_QUAT;
 
     // abc cannot move
     abc.x = tp->goalPos.a;
@@ -411,7 +412,6 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     PmPose start_xyz, end_xyz;
     PmPose start_uvw, end_uvw;
     PmPose start_abc, end_abc;
-    PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
     if (tpErrorCheck(tp)<0) return -1;
 
@@ -432,12 +432,12 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     end_abc.tran.y = end.b;
     end_abc.tran.z = end.c;
 
-    start_xyz.rot = identity_quat;
-    end_xyz.rot = identity_quat;
-    start_uvw.rot = identity_quat;
-    end_uvw.rot = identity_quat;
-    start_abc.rot = identity_quat;
-    end_abc.rot = identity_quat;
+    start_xyz.rot = IDENTITY_QUAT;
+    end_xyz.rot = IDENTITY_QUAT;
+    start_uvw.rot = IDENTITY_QUAT;
+    end_uvw.rot = IDENTITY_QUAT;
+    start_abc.rot = IDENTITY_QUAT;
+    end_abc.rot = IDENTITY_QUAT;
 
     pmLineInit(&line_xyz, start_xyz, end_xyz);
     pmLineInit(&line_uvw, start_uvw, end_uvw);
@@ -482,9 +482,10 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     tc.enables = enables;
     tc.indexrotary = indexrotary;
 
+
     TC_STRUCT* last_tc;
     if (tcqLen(&tp->queue)>1)
-        last_tc=tcqItem(&(tp->queue),-1);
+        last_tc=tcqLast(&(tp->queue));
     else last_tc=NULL;
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
     tc.finalvel=0.0;
@@ -528,7 +529,6 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     PmPose start_abc, end_abc;
     double helix_z_component;   // z of the helix's cylindrical coord system
     double helix_length;
-    PmQuaternion identity_quat = { 1.0, 0.0, 0.0, 0.0 };
 
     if (tpErrorCheck(tp)<0) return -1;
 
@@ -549,12 +549,12 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     end_uvw.tran.y = end.v;
     end_uvw.tran.z = end.w;
 
-    start_xyz.rot = identity_quat;
-    end_xyz.rot = identity_quat;
-    start_uvw.rot = identity_quat;
-    end_uvw.rot = identity_quat;
-    start_abc.rot = identity_quat;
-    end_abc.rot = identity_quat;
+    start_xyz.rot = IDENTITY_QUAT;
+    end_xyz.rot = IDENTITY_QUAT;
+    start_uvw.rot = IDENTITY_QUAT;
+    end_uvw.rot = IDENTITY_QUAT;
+    start_abc.rot = IDENTITY_QUAT;
+    end_abc.rot = IDENTITY_QUAT;
 
     pmCircleInit(&circle, start_xyz, end_xyz, center, normal, turn);
     pmLineInit(&line_uvw, start_uvw, end_uvw);
@@ -600,7 +600,7 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     //TEMPORARY HACK
     TC_STRUCT* last_tc;
     if (tcqLen(&tp->queue)>1)
-        last_tc=tcqItem(&(tp->queue),-1);
+        last_tc=tcqLast(&(tp->queue));
     else last_tc=NULL;
     //KLUDGE temporary hack to fake optimization from hand-tuned G-code
     tc.finalvel=0.0;
