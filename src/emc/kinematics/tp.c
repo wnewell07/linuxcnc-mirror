@@ -32,7 +32,7 @@ extern emcmot_debug_t *emcmotDebug;
 
 int output_chan = 0;
 syncdio_t syncdio; //record tpSetDout's here
-const PmQuaternion IDENTITY_QUAT = { 1.0, 0.0, 0.0, 0.0 };
+static const PmQuaternion TP_IDENTITY_QUAT = { 1.0, 0.0, 0.0, 0.0 };
 
 /**
  * Create the trajectory planner structure with an empty queue.
@@ -362,8 +362,8 @@ int tpAddRigidTap(TP_STRUCT *tp, EmcPose end, double vel, double ini_maxvel,
     start_xyz.tran = tp->goalPos.tran;
     end_xyz.tran = end.tran;
 
-    start_xyz.rot = IDENTITY_QUAT;
-    end_xyz.rot = IDENTITY_QUAT;
+    start_xyz.rot = TP_IDENTITY_QUAT;
+    end_xyz.rot = TP_IDENTITY_QUAT;
 
     // abc cannot move
     abc.x = tp->goalPos.a;
@@ -448,12 +448,12 @@ int tpAddLine(TP_STRUCT * tp, EmcPose end, int type, double vel, double ini_maxv
     end_abc.tran.y = end.b;
     end_abc.tran.z = end.c;
 
-    start_xyz.rot = IDENTITY_QUAT;
-    end_xyz.rot = IDENTITY_QUAT;
-    start_uvw.rot = IDENTITY_QUAT;
-    end_uvw.rot = IDENTITY_QUAT;
-    start_abc.rot = IDENTITY_QUAT;
-    end_abc.rot = IDENTITY_QUAT;
+    start_xyz.rot = TP_IDENTITY_QUAT;
+    end_xyz.rot = TP_IDENTITY_QUAT;
+    start_uvw.rot = TP_IDENTITY_QUAT;
+    end_uvw.rot = TP_IDENTITY_QUAT;
+    start_abc.rot = TP_IDENTITY_QUAT;
+    end_abc.rot = TP_IDENTITY_QUAT;
 
     pmLineInit(&line_xyz, start_xyz, end_xyz);
     pmLineInit(&line_uvw, start_uvw, end_uvw);
@@ -551,12 +551,12 @@ int tpAddCircle(TP_STRUCT * tp, EmcPose end,
     end_uvw.tran.y = end.v;
     end_uvw.tran.z = end.w;
 
-    start_xyz.rot = IDENTITY_QUAT;
-    end_xyz.rot = IDENTITY_QUAT;
-    start_uvw.rot = IDENTITY_QUAT;
-    end_uvw.rot = IDENTITY_QUAT;
-    start_abc.rot = IDENTITY_QUAT;
-    end_abc.rot = IDENTITY_QUAT;
+    start_xyz.rot = TP_IDENTITY_QUAT;
+    end_xyz.rot = TP_IDENTITY_QUAT;
+    start_uvw.rot = TP_IDENTITY_QUAT;
+    end_uvw.rot = TP_IDENTITY_QUAT;
+    start_abc.rot = TP_IDENTITY_QUAT;
+    end_abc.rot = TP_IDENTITY_QUAT;
 
     pmCircleInit(&circle, start_xyz, end_xyz, center, normal, turn);
     pmLineInit(&line_uvw, start_uvw, end_uvw);
