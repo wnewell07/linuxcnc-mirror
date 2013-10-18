@@ -175,6 +175,15 @@ EmcPose tcGetPosReal(TC_STRUCT * tc, int of_endpoint)
  * won't mess with them.
  */
 
+/** Return 0 if queue is valid, -1 if not */
+static inline int tcqCheck(TC_QUEUE_STRUCT* tcq)
+{
+    if ((0 == tcq) || (0 == tcq->queue)) 
+    {	        
+        return -1;
+    }
+    return 0;
+}
 
 /*! tcqCreate() function
  *
@@ -222,9 +231,9 @@ int tcqCreate(TC_QUEUE_STRUCT * tcq, int _size, TC_STRUCT * tcSpace)
  */   
 int tcqDelete(TC_QUEUE_STRUCT * tcq)
 {
-    if (0 != tcq && 0 != tcq->queue) {
-	/* free(tcq->queue); */
-	tcq->queue = 0;
+    if (!tcqCheck(tcq)) {
+        /* free(tcq->queue); */
+        tcq->queue = 0;
     }
 
     return 0;
@@ -244,9 +253,7 @@ int tcqDelete(TC_QUEUE_STRUCT * tcq)
  */
 int tcqInit(TC_QUEUE_STRUCT * tcq)
 {
-    if (0 == tcq) {
-	return -1;
-    }
+    if (tcqCheck(tcq)) return -1;
 
     tcq->_len = 0;
     tcq->start = tcq->end = 0;
@@ -270,9 +277,7 @@ int tcqInit(TC_QUEUE_STRUCT * tcq)
 int tcqPut(TC_QUEUE_STRUCT * tcq, TC_STRUCT tc)
 {
     /* check for initialized */
-    if (0 == tcq || 0 == tcq->queue) {
-	    return -1;
-    }
+    if (tcqCheck(tcq)) return -1;
 
     /* check for allFull, so we don't overflow the queue */
     if (tcq->allFull) {
@@ -316,9 +321,8 @@ int tcqRemove(TC_QUEUE_STRUCT * tcq, int n)
 	    return 0;		/* okay to remove 0 or fewer */
     }
 
-    if ((0 == tcq) || (0 == tcq->queue) ||	/* not initialized */
-	((tcq->start == tcq->end) && !tcq->allFull) ||	/* empty queue */
-	(n > tcq->_len)) {	/* too many requested */
+    if (tcqCheck(tcq) || ((tcq->start == tcq->end) && !tcq->allFull) || 
+            (n > tcq->_len)) {	/* too many requested */
 	    return -1;
     }
 
@@ -342,9 +346,7 @@ int tcqRemove(TC_QUEUE_STRUCT * tcq, int n)
  */   
 int tcqLen(TC_QUEUE_STRUCT * tcq)
 {
-    if (0 == tcq) {
-	    return -1;
-    }
+    if (tcqCheck(tcq)) return -1;
 
     return tcq->_len;
 }
@@ -362,10 +364,9 @@ int tcqLen(TC_QUEUE_STRUCT * tcq)
 TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n)
 {
     TC_STRUCT *t;
-    if ((0 == tcq) || (0 == tcq->queue) ||	/* not initialized */
-	(n < 0) || (n >= tcq->_len)) {	/* n too large */
-	return (TC_STRUCT *) 0;
-    }
+    //HACK: added negative indexing because of the mod function
+    if (tcqCheck(tcq) || (n < 0) || (n >= tcq->_len)) return NULL;
+
     t = &(tcq->queue[(tcq->start + n) % tcq->size]);
     return t;
 }
@@ -389,7 +390,7 @@ TC_STRUCT *tcqItem(TC_QUEUE_STRUCT * tcq, int n)
  */   
 int tcqFull(TC_QUEUE_STRUCT * tcq)
 {
-    if (0 == tcq) {
+    if (tcqCheck(tcq)) {
 	   return 1;		/* null queue is full, for safety */
     }
 
@@ -409,5 +410,21 @@ int tcqFull(TC_QUEUE_STRUCT * tcq)
 
     /* we're not into the margin */
     return 0;
+}
+
+/*! tcqLast() function
+ *
+ * \brief gets the last TC element in the queue, without removing it
+ *
+ * 
+ * @param    tcq       pointer to the TC_QUEUE_STRUCT
+ *
+ * @return	 TC_STRUCT returns the TC element
+ */   
+TC_STRUCT *tcqLast(TC_QUEUE_STRUCT * tcq)
+{
+    if (tcqCheck(tcq)) return NULL;
+    if (tcq->end>0) return &(tcq->queue[(tcq->end-1) % tcq->size]);
+    else return NULL;
 }
 
