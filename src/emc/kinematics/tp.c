@@ -23,7 +23,7 @@
 #include "motion_debug.h"
 
 //FIXME Roll this into RTAPI debug statements
-#define TP_DEBUG_OUTPUT
+/*#define TP_DEBUG_OUTPUT*/
 #include "tp_debug.h"
 
 
