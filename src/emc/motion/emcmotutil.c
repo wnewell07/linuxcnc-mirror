@@ -21,7 +21,7 @@
 int emcmotErrorInit(emcmot_error_t * errlog)
 {
     if (errlog == 0) {
-	return -1;
+        return -1;
     }
 
     errlog->head = 0;
@@ -39,8 +39,8 @@ int emcmotErrorPutfv(emcmot_error_t * errlog, const char *fmt, va_list ap)
     struct dbuf_iter it;
 
     if (errlog == 0 || errlog->num == EMCMOT_ERROR_NUM) {
-	/* full */
-	return -1;
+        /* full */
+        return -1;
     }
 
     errlog->head++;
@@ -75,8 +75,8 @@ int emcmotErrorPut(emcmot_error_t *errlog, const char *error)
 int emcmotErrorGet(emcmot_error_t * errlog, char *error)
 {
     if (errlog == 0 || errlog->num == 0) {
-	/* empty */
-	return -1;
+        /* empty */
+        return -1;
     }
 
     errlog->head++;

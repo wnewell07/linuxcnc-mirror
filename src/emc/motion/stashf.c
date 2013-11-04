@@ -53,15 +53,15 @@ static int get_code(const char **fmt_io, int *modifier_l) {
             case 'l':
                 *modifier_l = 1;
                 break;
-            // integers
+                // integers
             case 'd': case 'i': case 'x': case 'u': case 'X':
-            // doubles
+                // doubles
             case 'e': case 'E': case 'f': case 'F': case 'g': case 'G':
-            // char; string
+                // char; string
             case 'c': case 's':
-            // pointer
+                // pointer
             case 'p':
-            // literal percent
+                // literal percent
             case '%': goto format_end;
         }
     }
@@ -79,25 +79,25 @@ int vstashf(struct dbuf_iter *o, const char *fmt, va_list ap) {
         int code = get_code(&fmt, &modifier_l);
 
         switch(code) {
-        case '%':
-            break;
-        case 'c': case 'd': case 'i': case 'x': case 'u': case 'X':
-            if(modifier_l) {
-        case 'p':
-                dbuf_put_long(o, va_arg(ap, long));
-            } else {
-                dbuf_put_int(o, va_arg(ap, int));
-            }
-            break;
-        case 'e': case 'E': case 'f': case 'F': case 'g': case 'G':
-            dbuf_put_double(o, va_arg(ap, double));
-            break;
-        case 's':
-            dbuf_put_string(o, va_arg(ap, const char *));
-            break;
-        default:
-            return SET_ERRNO(-EINVAL);
-            break;
+            case '%':
+                break;
+            case 'c': case 'd': case 'i': case 'x': case 'u': case 'X':
+                if(modifier_l) {
+                    case 'p':
+                        dbuf_put_long(o, va_arg(ap, long));
+                } else {
+                    dbuf_put_int(o, va_arg(ap, int));
+                }
+                break;
+            case 'e': case 'E': case 'f': case 'F': case 'g': case 'G':
+                dbuf_put_double(o, va_arg(ap, double));
+                break;
+            case 's':
+                dbuf_put_string(o, va_arg(ap, const char *));
+                break;
+            default:
+                return SET_ERRNO(-EINVAL);
+                break;
         }
     }
     return 0;

@@ -78,7 +78,7 @@ Thinking only about the single axis planners for now...
 
 I don't really see any reason to have axis vel and accel limits in the ini file.  The
 machine's mechanical limits are related to the joints, not the axes.  So the axes should
-simply limiit themselves to whatever will keep the joints happy.
+simply limit themselves to whatever will keep the joints happy.
 
 If the limits for the single axis planners aren't in the ini file, we need to derive
 them somehow.  That is the root problem.

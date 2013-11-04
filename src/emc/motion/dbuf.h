@@ -23,39 +23,39 @@
 extern "C" {
 #endif
 
-struct dbuf {
-    size_t sz;
-    unsigned char *data;
-};
+    struct dbuf {
+        size_t sz;
+        unsigned char *data;
+    };
 
-struct dbuf_iter {
-    struct dbuf *base;
-    size_t offset;
-};
+    struct dbuf_iter {
+        struct dbuf *base;
+        size_t offset;
+    };
 
-struct dbuf *dbuf_new(unsigned sz);
-void dbuf_delete(struct dbuf *d);
-void dbuf_init(struct dbuf *d, unsigned char *data, unsigned sz);
+    struct dbuf *dbuf_new(unsigned sz);
+    void dbuf_delete(struct dbuf *d);
+    void dbuf_init(struct dbuf *d, unsigned char *data, unsigned sz);
 
-struct dbuf_iter *dbuf_iter_new(struct dbuf *d);
-void dbuf_iter_delete(struct dbuf_iter *di);
-void dbuf_iter_init(struct dbuf_iter *di, struct dbuf *d);
+    struct dbuf_iter *dbuf_iter_new(struct dbuf *d);
+    void dbuf_iter_delete(struct dbuf_iter *di);
+    void dbuf_iter_init(struct dbuf_iter *di, struct dbuf *d);
 
-int dbuf_put_byte(struct dbuf_iter *di, unsigned char data);
-int dbuf_put_bytes(struct dbuf_iter *di, const unsigned char *data, unsigned sz);
-int dbuf_put_int(struct dbuf_iter *di, int i);
-int dbuf_put_long(struct dbuf_iter *di, long i);
-int dbuf_put_float(struct dbuf_iter *di, float i);
-int dbuf_put_double(struct dbuf_iter *di, double i);
-int dbuf_put_string(struct dbuf_iter *di, const char *s);
+    int dbuf_put_byte(struct dbuf_iter *di, unsigned char data);
+    int dbuf_put_bytes(struct dbuf_iter *di, const unsigned char *data, unsigned sz);
+    int dbuf_put_int(struct dbuf_iter *di, int i);
+    int dbuf_put_long(struct dbuf_iter *di, long i);
+    int dbuf_put_float(struct dbuf_iter *di, float i);
+    int dbuf_put_double(struct dbuf_iter *di, double i);
+    int dbuf_put_string(struct dbuf_iter *di, const char *s);
 
-int dbuf_get_byte(struct dbuf_iter *di, unsigned char *b);
-int dbuf_get_bytes(struct dbuf_iter *di, unsigned char *data, unsigned sz);
-int dbuf_get_int(struct dbuf_iter *di, int *i);
-int dbuf_get_long(struct dbuf_iter *di, long *i);
-int dbuf_get_float(struct dbuf_iter *di, float *i);
-int dbuf_get_double(struct dbuf_iter *di, double *i);
-int dbuf_get_string(struct dbuf_iter *di, const char **s);
+    int dbuf_get_byte(struct dbuf_iter *di, unsigned char *b);
+    int dbuf_get_bytes(struct dbuf_iter *di, unsigned char *data, unsigned sz);
+    int dbuf_get_int(struct dbuf_iter *di, int *i);
+    int dbuf_get_long(struct dbuf_iter *di, long *i);
+    int dbuf_get_float(struct dbuf_iter *di, float *i);
+    int dbuf_get_double(struct dbuf_iter *di, double *i);
+    int dbuf_get_string(struct dbuf_iter *di, const char **s);
 
 #ifdef __cplusplus
 }

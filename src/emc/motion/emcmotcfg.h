@@ -17,11 +17,11 @@
 
 /* default name of EMCMOT ini file */
 #define DEFAULT_EMCMOT_INIFILE "emc.ini"	/* same as for EMC-- we're in 
-						   touch */
+                                               touch */
 
 /* number of joints supported
-   Note: this is not a global variable but a compile-time parameter
-   since it sets array sizes, etc. */
+Note: this is not a global variable but a compile-time parameter
+since it sets array sizes, etc. */
 #define EMCMOT_MAX_JOINTS 9
 /* number of axes defined by the interp */ //FIXME: shouldn't be here..
 #define EMCMOT_MAX_AXIS 9
@@ -37,9 +37,9 @@
 #define EMCMOT_ERROR_LEN 1024	/* how long error string can be */
 
 /*
-  Shared memory keys for simulated motion process. No base address
-  values need to be computed, since operating system does this for us
-  */
+   Shared memory keys for simulated motion process. No base address
+   values need to be computed, since operating system does this for us
+   */
 #define DEFAULT_SHMEM_KEY 100
 
 /* default comm timeout, in seconds */

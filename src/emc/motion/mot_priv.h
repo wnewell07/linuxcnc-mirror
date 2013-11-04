@@ -64,7 +64,7 @@ typedef struct {
     hal_bit_t *neg_lim_sw;	/* RPI: negative limit switch input */
     hal_bit_t *home_sw;		/* RPI: home switch input */
     hal_bit_t *index_enable;	/* RPIO: motmod sets: request reset on index
-				         encoder clears: index arrived */
+                                   encoder clears: index arrived */
     hal_bit_t *amp_fault;	/* RPI: amp fault input */
     hal_bit_t *amp_enable;	/* WPI: amp enable output */
     hal_s32_t *home_state;	/* WPI: homing state machine state */
@@ -93,7 +93,7 @@ typedef struct {
     hal_bit_t *feed_inhibit;	/* RPI: set TRUE to stop motion (non maskable)*/
     hal_bit_t *motion_enabled;	/* RPI: motion enable for all joints */
     hal_bit_t *in_position;	/* RPI: all joints are in position */
-//    hal_bit_t *inpos_output;	/* WPI: all joints are in position (used to power down steppers for example) */
+    //    hal_bit_t *inpos_output;	/* WPI: all joints are in position (used to power down steppers for example) */
     hal_bit_t *coord_mode;	/* RPA: TRUE if coord, FALSE if free */
     hal_bit_t *teleop_mode;	/* RPA: TRUE if teleop mode */
     hal_bit_t *coord_error;	/* RPA: TRUE if coord mode error */
@@ -112,7 +112,7 @@ typedef struct {
     hal_float_t debug_float_3;	/* RPA: generic param, for debugging */
     hal_s32_t debug_s32_0;	/* RPA: generic param, for debugging */
     hal_s32_t debug_s32_1;	/* RPA: generic param, for debugging */
-    
+
     hal_bit_t *synch_do[EMCMOT_MAX_DIO]; /* WPI array: output pins for motion synched IO */
     hal_bit_t *synch_di[EMCMOT_MAX_DIO]; /* RPI array: input pins for motion synched IO */
     hal_float_t *analog_input[EMCMOT_MAX_AIO]; /* RPI array: input pins for analog Inputs */
@@ -144,7 +144,7 @@ typedef struct {
     hal_float_t *spindle_speed_out_rps_abs;	/* spindle speed output absolute*/
     hal_float_t *spindle_speed_cmd_rps;	/* spindle speed command without SO applied */
     hal_float_t *spindle_speed_in;	/* spindle speed measured */
-    
+
     // spindle orient
     hal_float_t *spindle_orient_angle;	/* out: desired spindle angle, degrees */
     hal_s32_t   *spindle_orient_mode;	/* out: 0: least travel; 1: cw; 2: ccw */
@@ -181,8 +181,8 @@ typedef struct {
 } emcmot_hal_data_t;
 
 /***********************************************************************
-*                   GLOBAL VARIABLE DECLARATIONS                       *
-************************************************************************/
+ *                   GLOBAL VARIABLE DECLARATIONS                       *
+ ************************************************************************/
 
 /* HAL component ID for motion module */
 extern int mot_comp_id;
@@ -205,13 +205,13 @@ extern emcmot_hal_data_t *emcmot_hal_data;
 /* pointer to array of joint structs with all joint data */
 /* the actual array may be in shared memory or in kernel space, as
    determined by the init code in motion.c
-*/
+   */
 extern emcmot_joint_t *joints;
 
 /* flag used to indicate that this is the very first pass thru the
    code.  Various places in the code use this to set initial conditions
    and avoid startup glitches.
-*/
+   */
 extern int first_pass;
 
 /* Variable defs */
@@ -236,8 +236,8 @@ extern struct emcmot_internal_t *emcmotInternal;
 extern struct emcmot_error_t *emcmotError;
 
 /***********************************************************************
-*                    PUBLIC FUNCTION PROTOTYPES                        *
-************************************************************************/
+ *                    PUBLIC FUNCTION PROTOTYPES                        *
+ ************************************************************************/
 
 /* function definitions */
 extern void emcmotCommandHandler(void *arg, long period);
@@ -265,9 +265,9 @@ extern void clearHomes(int joint_num);
 extern void emcmot_config_change(void);
 extern void reportError(const char *fmt, ...) __attribute((format(printf,1,2))); /* Use the rtapi_print call */
 
- /* rtapi_get_time() returns a nanosecond value. In time, we should use a u64
-    value for all calcs and only do the conversion to seconds when it is
-    really needed. */
+/* rtapi_get_time() returns a nanosecond value. In time, we should use a u64
+   value for all calcs and only do the conversion to seconds when it is
+   really needed. */
 #define etime() (((double) rtapi_get_time()) / 1.0e9)
 
 /* macros for reading, writing bit flags */

@@ -21,13 +21,13 @@ extern "C" {
 
 #define EMCMOT_INIFILE_LEN 256
 
-/*! \todo FIXME - eventually want to convert all of these to lowercase,
-   uppercase is for constants only
-*/
+    /*! \todo FIXME - eventually want to convert all of these to lowercase,
+      uppercase is for constants only
+      */
 
-/*! \todo FIXME - want to move some of these out of here completely...
-   too many globals - put in emcmotXXX structs instead, perhaps?
-*/
+    /*! \todo FIXME - want to move some of these out of here completely...
+      too many globals - put in emcmotXXX structs instead, perhaps?
+      */
 
     extern char EMCMOT_INIFILE[EMCMOT_INIFILE_LEN];
 
