@@ -1848,8 +1848,51 @@ void tpTrapezoidalCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
  * velocity and acceleration limits. The formula has been tweaked slightly to
  * allow a non-zero velocity at the instant the target is reached.
  */
-void tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
-#warning function not implemented
+STATIC int tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
+    //Initial guess at dt for next round
+    double dx = tc->target - tc->progress;
+
+    //TODO limit by target velocity?
+    double target_vel = tpGetRealTargetVel(tp, tc);
+    double v_f = tpGetRealFinalVel(tp, tc, target_vel);
+    double v_avg = tc->currentvel + v_f;
+
+    //Check that we have a non-zero "average" velocity between now and the
+    //finish. If not, it means that we have to accelerate from a stop, which
+    //will take longer than the minimum 2 timesteps that each segment takes, so
+    //we're safely far form the end.
+
+    if (v_avg < TP_VEL_EPSILON && dx > (v_avg * tp->cycleTime)) {
+        tp_debug_print(" velocity average too low for smoothing\n");
+        return TP_ERR_FAIL;
+    }
+
+    //Get dt assuming that we can magically reach the final velocity at
+    //the end of the move.
+    double dt = 2.0 * dx / v_avg;
+    //Calculate the acceleration this would take:
+
+    double a_f;
+    double dv = v_f - tc->currentvel;
+    if (dt < TP_TIME_EPSILON) {
+        tp_debug_print("dt = %f, assuming large final accel\n", dt);
+        a_f = TP_BIG_NUM * fsign(dv);
+    } else {
+        a_f = dv / dt;
+    }
+
+    //If this is a valid acceleration, then we're done. If not, then we solve
+    //for v_f and dt given the max acceleration allowed.
+    double a_max = tpGetScaledAccel(tp,tc);
+    tp_debug_print(" initial results: dx= %f,dt = %f, a_f = %f, v_f = %f\n",dx,dt,a_f,v_f);
+
+    //Saturate acceleration and figure out new velocity
+    double a = saturate(a_f, a_max + TP_ACCEL_EPSILON);
+    double v_f_reachable = tc->currentvel + dt * a;
+    double newvel = a * tc->cycle_time + tc->currentvel;
+    tc->progress += (tc->current_vel +newvel) / 2.0 * tc->cycle_time;
+    
+    return TP_ERR_OK;
 }
 
 void tpToggleDIOs(TC_STRUCT * const tc) {
