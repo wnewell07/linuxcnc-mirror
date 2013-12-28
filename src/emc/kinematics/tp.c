@@ -1852,6 +1852,10 @@ STATIC int tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
     //Initial guess at dt for next round
     double dx = tc->target - tc->progress;
 
+    if (!tc->blending_next) {
+        tc->vel_at_blend_start = tc->currentvel;
+    }
+
     //TODO limit by target velocity?
     double target_vel = tpGetRealTargetVel(tp, tc);
     double v_f = tpGetRealFinalVel(tp, tc, target_vel);
@@ -1880,6 +1884,7 @@ STATIC int tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
     } else {
         a_f = dv / dt;
     }
+    //TODO update blend velocity
 
     //If this is a valid acceleration, then we're done. If not, then we solve
     //for v_f and dt given the max acceleration allowed.
@@ -1888,10 +1893,10 @@ STATIC int tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
 
     //Saturate acceleration and figure out new velocity
     double a = saturate(a_f, a_max + TP_ACCEL_EPSILON);
-    double v_f_reachable = tc->currentvel + dt * a;
     double newvel = a * tc->cycle_time + tc->currentvel;
-    tc->progress += (tc->current_vel +newvel) / 2.0 * tc->cycle_time;
-    
+    tc->progress += (tc->currentvel +newvel) / 2.0 * tc->cycle_time;
+    tc->currentvel = newvel;
+
     return TP_ERR_OK;
 }
 
@@ -2521,7 +2526,13 @@ STATIC int tpUpdateCycle(TP_STRUCT * const tp,
     tcGetPos(tc, &position9_before);
 
     //Run cycle update with stored cycle time
-    tpTrapezoidalCycleStep(tp, tc);
+    int res = 1;
+    if (tc->smoothing) {
+        res = tpSmoothCycleStep(tp, tc);
+    }
+    if (res) {
+        tpTrapezoidalCycleStep(tp, tc);
+    }
 
     //Check if we're near the end of the cycle and set appropriate changes
     tpCheckEndCondition(tp, tc);
