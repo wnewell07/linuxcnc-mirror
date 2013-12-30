@@ -32,11 +32,6 @@
  * and selectively compile in assertions and debug printing.
  */
 
-//TODO clean up these names
-/*#define TP_DEBUG*/
-/*#define TC_DEBUG*/
-/*#define TP_INFO_LOGGING*/
-
 #include "tp_debug.h"
 
 #ifndef SIM
@@ -845,7 +840,7 @@ STATIC int tpCreateBlendArc(TP_STRUCT const * const tp, TC_STRUCT * const prev_t
     tp_debug_print("a_n_max = %f\n",a_n_max);
 
     //Find common velocity and acceleration
-    double v_req = fmax(prev_tc->reqvel, tc->reqvel);
+    double v_req = fmin(prev_tc->reqvel, tc->reqvel);
     double v_goal = v_req * emcmotConfig->maxFeedScale;
     tp_debug_print("vr1 = %f, vr2 = %f\n", prev_tc->reqvel, tc->reqvel);
     tp_debug_print("v_goal = %f, max scale = %f\n", v_goal, emcmotConfig->maxFeedScale);
@@ -1205,10 +1200,6 @@ STATIC int tpComputeOptimalVelocity(TP_STRUCT const * const tp, TC_STRUCT * cons
 
     //Limit tc's target velocity to avoid creating "humps" in the velocity profile
     prev1_tc->finalvel = vs_back;
-    if (tc->smoothing) {
-        double v_max_end = fmax(prev1_tc->finalvel, tc->finalvel);
-        tc->target_vel = fmin(v_max_end, tc->maxvel);
-    }
 
     tp_info_print(" prev1_tc-> fv = %f, tc->fv = %f, capped target = %f\n",
             prev1_tc->finalvel, tc->finalvel, tc->target_vel);
@@ -1721,7 +1712,10 @@ STATIC double saturate(double x, double max) {
 }
 
 
-int tcUpdateCyclePosFromVel(TC_STRUCT * const tc, double newvel, double maxaccel, double * const v_out, double * const acc_out)
+/**
+ * Calculate distance update from velocity and acceleration
+ */
+STATIC int tcUpdateCyclePosFromVel(TC_STRUCT * const tc, double newvel, double maxaccel, double * const v_out, double * const acc_out)
 {
     // Calculate acceleration needed to reach newvel, bounded by machine maximum
     double maxnewaccel = (newvel - tc->currentvel) / tc->cycle_time;
@@ -1744,12 +1738,6 @@ int tcUpdateCyclePosFromVel(TC_STRUCT * const tc, double newvel, double maxaccel
     // Note that progress can be greater than the target after this step.
     double displacement = (v_next + tc->currentvel) * 0.5 * tc->cycle_time;
     tc->progress += displacement;
-
-    if (tc->progress > tc->target) {
-        tc_debug_print("passed target by %g, cutting off at target!\n",
-                tc->progress - tc->target);
-        tc->progress = tc->target;
-    }
 
     *v_out = v_next;
     *acc_out = newaccel;
@@ -1856,46 +1844,37 @@ STATIC int tpSmoothCycleStep(TP_STRUCT const * const tp, TC_STRUCT * const tc) {
         tc->vel_at_blend_start = tc->currentvel;
     }
 
-    //TODO limit by target velocity?
     double target_vel = tpGetRealTargetVel(tp, tc);
-    double v_f = tpGetRealFinalVel(tp, tc, target_vel);
-    double v_avg = tc->currentvel + v_f;
+    double vel_final = tpGetRealFinalVel(tp, tc, target_vel);
+    double vel_avg = tc->currentvel + vel_final;
 
-    //Check that we have a non-zero "average" velocity between now and the
-    //finish. If not, it means that we have to accelerate from a stop, which
-    //will take longer than the minimum 2 timesteps that each segment takes, so
-    //we're safely far form the end.
-
-    if (v_avg < TP_VEL_EPSILON && dx > (v_avg * tp->cycleTime)) {
-        tp_debug_print(" velocity average too low for smoothing\n");
+    /* Check if the average velocity is too low to properly ramp up. This
+     * happens if the initial / final velocity are both zero, for example.
+     */
+    if (vel_avg < TP_VEL_EPSILON) {
+        tp_debug_print(" vel_avg %f too low for smoothing\n", vel_avg);
         return TP_ERR_FAIL;
     }
 
-    //Get dt assuming that we can magically reach the final velocity at
-    //the end of the move.
-    double dt = 2.0 * dx / v_avg;
-    //Calculate the acceleration this would take:
+    // Calculate time remaining in this segment assuming constant acceleration
+    double dt = fmax(2.0 * dx / vel_avg, TP_TIME_EPSILON);
 
-    double a_f;
-    double dv = v_f - tc->currentvel;
-    if (dt < TP_TIME_EPSILON) {
-        tp_debug_print("dt = %f, assuming large final accel\n", dt);
-        a_f = TP_BIG_NUM * fsign(dv);
-    } else {
-        a_f = dv / dt;
-    }
-    //TODO update blend velocity
+    // Calculate velocity change between final and current velocity
+    double dv = vel_final - tc->currentvel;
 
-    //If this is a valid acceleration, then we're done. If not, then we solve
-    //for v_f and dt given the max acceleration allowed.
-    double a_max = tpGetScaledAccel(tp,tc);
-    tp_debug_print(" initial results: dx= %f,dt = %f, a_f = %f, v_f = %f\n",dx,dt,a_f,v_f);
+    // Estimate constant acceleration required
+    double acc_final = dv / dt;
 
-    //Saturate acceleration and figure out new velocity
-    double a = saturate(a_f, a_max + TP_ACCEL_EPSILON);
-    double newvel = a * tc->cycle_time + tc->currentvel;
-    tc->progress += (tc->currentvel +newvel) / 2.0 * tc->cycle_time;
+    // Saturate estimated acceleration against maximum allowed by segment
+    double acc_max = tpGetScaledAccel(tp, tc);
+    double acc = saturate(acc_final, acc_max);
+
+    // Calculate 
+    double newvel = acc * tc->cycle_time + tc->currentvel;
+    tc->progress += (tc->currentvel + newvel) / 2.0 * tc->cycle_time;
     tc->currentvel = newvel;
+    tc_debug_print(" tc result (ramping): dx = %f, dt = %f, acc_final = %f, vel_final = %f\n", 
+            dx, dt, acc, vel_final);
 
     return TP_ERR_OK;
 }
