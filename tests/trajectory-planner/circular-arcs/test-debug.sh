@@ -2,7 +2,7 @@
 set -o monitor
 ./build-debug.sh
 cp position.blank position.txt
-linuxcnc -r circular_arcs.ini > test.log &
+linuxcnc configs/circular_arcs.ini > test.log &
 python machine_setup.py $1
 fg
 ./process_runlog.sh test.log
