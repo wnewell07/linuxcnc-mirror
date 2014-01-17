@@ -168,6 +168,30 @@ int tcConnectBlendArc(TC_STRUCT * const prev_tc, TC_STRUCT * const tc,
         PmCartesian const * const circ_end);
 
 int tcIsBlending(TC_STRUCT * const tc);
+
+/* LineArc data */
+//TODO add other useful stuff here as well, like normals.
+//TODO make this a general struct for all blend types?
+typedef struct {
+    PmCartesian u1;
+    PmCartesian u2;
+    PmCartesian P;
+    PmCartesian C1;
+    PmCartesian Q1;
+    PmCartesian Q2;
+    PmCartesian C;
+    double R1;
+    double tolerance;
+    double L2;
+    double v_req;
+    double v_plan;
+    double v_actual;
+    double a_max;
+    double dphi1;
+    double R;
+    double d;
+} LineArcData;
+
 /* queue of TC_STRUCT elements*/
 
 typedef struct {

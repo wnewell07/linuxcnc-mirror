@@ -64,6 +64,7 @@ STATIC double saturate(double x, double max);
 
 STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc);
 STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc, int inc_id);
+
 //Empty function to act as an assert for GDB in simulation
 int gdb_fake_catch(int condition){
     return condition;
@@ -952,16 +953,289 @@ STATIC int tpFinalizeSegmentLength(TP_STRUCT const * const tp, TC_STRUCT * const
     return TP_ERR_OK;
 }
 
-STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, TC_STRUCT * const tc, TC_STRUCT * const blend_tc)
+STATIC int quadraticFormula(double A, double B, double C, double * const root0,
+        double * const root1)
 {
-    #warning not implemented
+    double disc = pmSq(B) - 4.0 * A * C;
+    if (disc < 0) {
+        tp_debug_print("discriminant < 0\n");
+        return TP_ERR_FAIL;
+    }
+    double t1 = pmSqrt(disc);
+    *root0 = ( -B + t1) / (2.0 * A);
+    *root1 = ( -B - t1) / (2.0 * A);
+    return TP_ERR_OK;
+}
+
+STATIC int tpFindArcLineDist(double a, double b, double R1, double T,
+        int convex, double * const d)
+{
+    /* Compute distance along line segment where tangent arc with tolerance T will hit.*/
+    /*   a = (P-C1) . u2*/
+    /*   b = (P-C1) . n2*/
+
+    double sgn = 1.0;
+    if (convex) {
+        sgn=-1.0;
+    } 
+
+    double A = T/(b-sgn*R1)-1.0;
+    double B = T*a/(b-sgn*R1);
+    double C = pmSqrt(T);;
+
+    double d0=0;
+    double d1=0;
+
+    quadraticFormula(A, B, C, &d0, &d1);
+    if (d0>0 && d1>0) {
+        *d=fmin(d0,d1);
+    } else {
+        *d=fmax(d0,d1);
+    }
+    return TP_ERR_OK;
+
+}
+
+STATIC int tpFindRadiusFromDist(double a, double b, double R1, double d, int convex, double * const R)
+{
+    //For the arc-line case, when a distance d is specified, find the corresponding radius
+    double sgn = 1.0;
+    if (convex) {
+        sgn = -1;
+    }
+
+    double den = (R1-sgn*b);
+    if (fabs(den) < TP_POS_EPSILON) {
+        return TP_ERR_FAIL;
+    }
+
+    *R = sgn * (pmSq(d) / 2.0 + a * d) / den;
+
+    return TP_ERR_OK;
+
+}
+
+STATIC int tpFindDistFromRadius(double a, double b, double R1, double R, int convex, double * const d)
+{
+    double sgn = 1.0;
+    if (convex) {
+        sgn=-1;
+    }
+
+    double K1=pmSq(b+R);
+    double K2=pmSq(R1+sgn*R);
+    double d0=0;
+    double d1=0;
+
+    quadraticFormula(1.0,2.0*a,K1-K2+pmSq(a),&d0,&d1);
+    if (d0>0 && d1>0){
+        *d=fmin(d0,d1);
+    } else {
+        *d=fmax(d0,d1);
+    }
+    return TP_ERR_OK;
+}
+
+
+STATIC int tpLineArcConvexTest(PmCartesian const * const C1,
+        PmCartesian const * const P, PmCartesian const * const u2)
+{
+    //Check if an arc-line intersection is concave or convex
+    double dot;
+    PmCartesian diff;
+    pmCartCartSub(P,C1,&diff);
+    pmCartCartDot(&diff, u2, &dot);
+    if (dot > 0) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+STATIC int lineArcComputeData(LineArcData * const linearc) {
+ 
+    // Check for coplanarity
+    // arc-line equations
+    PmCartesian n2,binormal;
+
+    pmCartCartCross(&linearc->u1, &linearc->u2, &binormal);
+    pmCartUnit(&binormal,&binormal);
+    pmCartCartCross(&binormal, &linearc->u2, &n2);
+
+    int convex = tpLineArcConvexTest(&linearc->C1,&linearc->P,&linearc->u2);
+    double sgn = 1.0;
+    if (convex) {
+        sgn=-1.0;
+    } 
+
+    //Parallel and perp. components of P-C1
+    PmCartesian r_C1P;
+    pmCartCartSub(&linearc->P,&linearc->C1, &r_C1P);
+
+    //Project C1 - P onto u2 and n2
+    double a, b;
+    pmCartCartDot(&r_C1P, &linearc->u2, &a);
+    pmCartCartDot(&r_C1P, &n2, &b);
+
+    double d_tol;
+    int err = tpFindArcLineDist(a, b, linearc->R1, linearc->tolerance, convex, &d_tol);
+    if (err) {
+        return err;
+    }
+
+    //Find distance bounded by length of line move
+    double d_line = fmin(d_tol, linearc->L2 * 0.5);
+    tp_debug_print("d_line = %f\n",d_line);
+
+    //Find corresponding radius to d_line
+    double R_line = 0;
+    err = tpFindRadiusFromDist(a,b,linearc->R1,d_line,convex, &R_line);
+
+    //New upper bound is the lower of the two
+    //FIXME hard-code upper bound until we figure out a better way
+    double R_bound = 10;
+    double R_geom = fmin(R_line, R_bound);
+    tp_debug_print("R_geom = %f\n",R_geom);
+
+    //The new radius and line distance is found based on limits of v_req
+    // Based on motion segments, compute the maximum velocity we can get based
+    //on the requested blend radius and the normal acceleration bounds. Use this
+    //to compute the actual upper limit on blend radius.
+
+    //The nominal speed of the blend arc should be the higher of the two segment speeds
+
+    double a_max;
+    tpGetMachineAccelLimit(&a_max);
+    linearc->a_max = a_max;
+
+    double a_n_max=a_max * TP_ACC_RATIO_NORMAL;
+
+    //Calculate limiting velocity due to radius and normal acceleration
+    double v_normal = pmSqrt(a_n_max * R_geom);
+    tp_debug_print("v_normal = %f\n",v_normal);
+
+    //If the requested feed is lower than the peak velocity, reduce the arc size to match
+    double v_upper = fmin(linearc->v_req, v_normal);
+
+    double R_upper = pmSq(v_upper)/a_n_max;
+    linearc->R = R_upper;
+
+    double d_upper=0;
+    tpFindDistFromRadius(a,b, linearc->R1, R_upper, convex, &d_upper);
+    linearc->d = d_upper;
+
+    tp_debug_print("R_upper = %f, d_upper = %f\n",R_upper,d_upper);
+
+    //Store velocity
+    linearc->v_plan = v_upper;
+
+    //Find the blend arc's center
+    /*double C = P + d_upper*u2 + R_upper*n2*/
+    PmCartesian tmp;
+    pmCartScalMult(&linearc->u2, d_upper, &linearc->C);
+    pmCartScalMult(&n2, R_upper, &tmp);
+    pmCartCartAdd(&linearc->P, &linearc->C, &linearc->C);
+    pmCartCartAdd(&tmp, &linearc->C, &linearc->C);
+
+    PmCartesian r_C1C, uc;
+    pmCartCartSub(&linearc->C1, &linearc->C, &r_C1C);
+    pmCartUnit(&r_C1C, &uc);
+
+    //Calculate blend arc intersections with original segments
+    //Q1=C+sgn*uc*R_upper
+    pmCartScalMult(&uc, R_upper*sgn, &linearc->Q1);
+    pmCartCartAdd(&linearc->Q1, &linearc->C, &linearc->Q1);
+    //Q2=P+d_upper*u2
+    pmCartScalMult(&linearc->u2, d_upper, &linearc->Q2);
+    pmCartCartAdd(&linearc->P, &linearc->Q2, &linearc->Q2);
+
+    //Calculate angle reduction for arc
+    PmCartesian up;
+    pmCartUnit(&r_C1P,&up);
+    
+    double dot = 0;
+    pmCartCartDot(&up,&uc,&dot);
+    //FIXME domain bound
+    linearc->dphi1 = acos(dot);
+    return TP_ERR_OK;
+}
+
+
+STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc)
+{
+
+    //TODO bail if there is spiral or helix
+    double dot;
+
+    LineArcData linearc;
+
+    linearc.tolerance = tcFindBlendTolerance(prev_tc, tc);
+
+    pmCartCartDot(&tc->coords.circle.xyz.normal, &prev_tc->coords.line.xyz.uVec, &dot);
+    if (dot > TP_POS_EPSILON) {
+        tp_debug_print("arc and line not coplanar, can't create blend arc\n");
+        return TP_ERR_FAIL;
+    }
+    tcGetEndTangentUnitVector(prev_tc, &linearc.u2);
+    tcGetStartTangentUnitVector(tc, &linearc.u1);
+    pmCartScalMult(&linearc.u1,-1,&linearc.u1);
+    pmCartScalMult(&linearc.u2,-1,&linearc.u2);
+    linearc.P = prev_tc->coords.line.xyz.end;
+    linearc.C1 = tc->coords.circle.xyz.center;
+    linearc.R1= tc->coords.circle.xyz.radius;
+    linearc.L2 = prev_tc->target;
+
+    linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
+
+    lineArcComputeData(&linearc);
+
+
+    //FIXME fail out for now until formulas are right
     return TP_ERR_FAIL;
 }
 
 
 STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, TC_STRUCT * const tc, TC_STRUCT * const blend_tc)
 {
-    #warning not implemented
+
+    //TODO bail if there is spiral or helix
+    double dot;
+    tp_debug_print("*-*-*-*-*-*-*-*-*-*-\n");
+
+    LineArcData linearc;
+
+    linearc.tolerance = tcFindBlendTolerance(prev_tc, tc);
+
+    pmCartCartDot(&prev_tc->coords.circle.xyz.normal, &tc->coords.line.xyz.uVec, &dot);
+    if (dot > TP_POS_EPSILON) {
+        tp_debug_print("arc and line not coplanar, can't create blend arc\n");
+        return TP_ERR_FAIL;
+    }
+    //Arc-line
+    tcGetEndTangentUnitVector(prev_tc, &linearc.u1);
+    tcGetStartTangentUnitVector(tc, &linearc.u2);
+    linearc.P = tc->coords.line.xyz.start;
+    linearc.C1 = prev_tc->coords.circle.xyz.center;
+    linearc.R1= prev_tc->coords.circle.xyz.radius;
+    linearc.L2 = tc->target;
+
+    linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
+
+    lineArcComputeData(&linearc);
+    //Setup actual velocity
+    linearc.v_actual = fmin(fmax(tpGetRealTargetVel(tp,prev_tc),tpGetRealTargetVel(tp,tc)),linearc.v_plan);
+    tp_debug_print("v_actual = %f\n",linearc.v_actual);
+    tp_debug_print("a_max = %f\n",linearc.a_max);
+    tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
+
+    //TODO shorten arc to Q1
+    double new_angle = prev_tc->coords.circle.xyz.angle - linearc.dphi1;
+    pmCircleStretch(&prev_tc->coords.circle.xyz,new_angle, 0);
+    double new_len = tc->coords.line.xyz.tmag - linearc.d;
+    pmCartLineStretch(&tc->coords.line.xyz, new_len,1);
+    //TODO shorten line to Q2
+    //TODO queue blend arc
+    //FIXME fail out for now until formulas are right
     return TP_ERR_FAIL;
 }
 
@@ -1561,12 +1835,14 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
             res = tpCreateLineLineBlend(tp, prev_tc, tc, &blend_tc);
             break;
         case BLEND_LINE_ARC:
+            return TP_ERR_FAIL;
             res = tpCreateLineArcBlend(tp, prev_tc, tc, &blend_tc);
             break;
         case BLEND_ARC_LINE:
             res = tpCreateArcLineBlend(tp, prev_tc, tc, &blend_tc);
             break;
         case BLEND_ARC_ARC:
+            return TP_ERR_FAIL;
             res = tpCreateArcArcBlend(tp, prev_tc, tc, &blend_tc);
             break;
         default:
