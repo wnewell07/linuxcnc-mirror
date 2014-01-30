@@ -1707,6 +1707,7 @@ int pmCartLineStretch(PmCartLine * const line, double new_len, int from_end)
         // Offset the new end point by the current start point
         r2 = pmCartCartAdd(&line->start, &line->end, &line->end);
     }
+    line->tmag = new_len;
 
     return pmErrno = (r1 || r2) ? PM_NORM_ERR : 0;
 }
