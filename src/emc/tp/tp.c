@@ -64,7 +64,6 @@ STATIC double saturate(double x, double max);
 
 STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc);
 STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc, int inc_id);
-
 //Empty function to act as an assert for GDB in simulation
 int gdb_fake_catch(int condition){
     return condition;
@@ -1059,7 +1058,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     PmCartesian n2,binormal;
 
     pmCartCartCross(&linearc->u1, &linearc->u2, &binormal);
-    pmCartUnit(&binormal,&binormal);
+    pmCartUnitEq(&binormal);
     pmCartCartCross(&binormal, &linearc->u2, &n2);
 
     int convex = tpLineArcConvexTest(&linearc->C1,&linearc->P,&linearc->u2);
@@ -1137,9 +1136,9 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     pmCartCartAdd(&linearc->P, &linearc->C, &linearc->C);
     pmCartCartAdd(&tmp, &linearc->C, &linearc->C);
 
-    PmCartesian r_C1C, uc;
-    pmCartCartSub(&linearc->C1, &linearc->C, &r_C1C);
-    pmCartUnit(&r_C1C, &uc);
+    PmCartesian r_CC1, uc;
+    pmCartCartSub(&linearc->C1, &linearc->C, &r_CC1);
+    pmCartUnit(&r_CC1, &uc);
 
     //Calculate blend arc intersections with original segments
     //Q1=C+sgn*uc*R_upper
@@ -1156,7 +1155,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     double dot = 0;
     pmCartCartDot(&up,&uc,&dot);
     //FIXME domain bound
-    linearc->dphi1 = acos(dot);
+    linearc->dphi1 = acos(-dot);
     return TP_ERR_OK;
 }
 
@@ -1226,17 +1225,30 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.v_actual = fmin(fmax(tpGetRealTargetVel(tp,prev_tc),tpGetRealTargetVel(tp,tc)),linearc.v_plan);
     tp_debug_print("v_actual = %f\n",linearc.v_actual);
     tp_debug_print("a_max = %f\n",linearc.a_max);
+
+    // Setup blend arc from linearc data
+    arcInitFromPoints(&blend_tc->coords.arc.xyz,
+            &linearc.Q1,
+            &linearc.Q2,
+            &linearc.C);
+    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.circle.abc.end, &tc->coords.circle.abc.start);
+    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.circle.uvw.end, &tc->coords.circle.uvw.start);
+
+    //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
 
-    //TODO shorten arc to Q1
+    //Update prev tc
     double new_angle = prev_tc->coords.circle.xyz.angle - linearc.dphi1;
-    pmCircleStretch(&prev_tc->coords.circle.xyz,new_angle, 0);
+    pmCircleStretch(&prev_tc->coords.circle.xyz, new_angle, 0);
+    prev_tc->target = prev_tc->coords.circle.xyz.radius * prev_tc->coords.circle.xyz.angle;
+    prev_tc->term_cond = TC_TERM_COND_TANGENT;
+
+    //Update tc
     double new_len = tc->coords.line.xyz.tmag - linearc.d;
-    pmCartLineStretch(&tc->coords.line.xyz, new_len,1);
-    //TODO shorten line to Q2
-    //TODO queue blend arc
+    pmCartLineStretch(&tc->coords.line.xyz, new_len, 1);
+    tc->target = new_len;
     //FIXME fail out for now until formulas are right
-    return TP_ERR_FAIL;
+    return TP_ERR_OK;
 }
 
 STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc)
