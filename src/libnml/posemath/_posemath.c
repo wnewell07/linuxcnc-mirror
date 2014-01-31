@@ -1912,8 +1912,7 @@ int pmCircleStretch(PmCircle * const circ, double new_angle, int from_end)
 
     double mag = 0;
     pmCartMagSq(&circ->rHelix, &mag);
-    if ( mag > 1e-8 ||
-            fabs(circ->spiral) > 1e-8) {
+    if ( mag > 1e-6 ) {
         //Can't handle helices or spirals
         return PM_ERR;
     }

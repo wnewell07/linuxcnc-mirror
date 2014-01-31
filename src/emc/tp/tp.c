@@ -1086,17 +1086,28 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
         return err;
     }
 
+    double d_arc = 0;
+    if (!convex) {
+        d_arc = linearc->phi1 * linearc->R1 / 2.0;
+    } else {
+        return TP_ERR_FAIL;
+    }
     //Find distance bounded by length of line move
-    double d_line = fmin(d_tol, linearc->L2 * 0.5);
-    tp_debug_print("d_line = %f\n",d_line);
+    double d_line = linearc->L2 * 0.5;
+    tp_debug_print("d_arc = %f, d_tol = %f, d_line = %f\n",d_arc,d_tol,d_line);
+
+    double d_geom = fmin(fmin(d_line,d_tol),d_arc);
 
     //Find corresponding radius to d_line
     double R_line = 0;
-    err = tpFindRadiusFromDist(a,b,linearc->R1,d_line,convex, &R_line);
+    err = tpFindRadiusFromDist(a,b,linearc->R1,d_geom,convex, &R_line);
+    if (err)  {
+        return err;
+    }
 
     //New upper bound is the lower of the two
     //FIXME hard-code upper bound until we figure out a better way
-    double R_bound = 10;
+    double R_bound = 10000;
     double R_geom = fmin(R_line, R_bound);
     tp_debug_print("R_geom = %f\n",R_geom);
 
@@ -1124,7 +1135,10 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     linearc->R = R_upper;
 
     double d_upper=0;
-    tpFindDistFromRadius(a,b, linearc->R1, R_upper, convex, &d_upper);
+    err = tpFindDistFromRadius(a,b, linearc->R1, R_upper, convex, &d_upper);
+    if (err) {
+        return err;
+    }
     linearc->d = d_upper;
 
     tp_debug_print("R_upper = %f, d_upper = %f\n",R_upper,d_upper);
@@ -1161,6 +1175,9 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     pmCartCartDot(&up,&uc,&dot);
     //FIXME domain bound
     linearc->dphi1 = acos(-dot);
+
+    tp_debug_print("dphi1 = %f, phi1 = %f, ratio = %f\n",
+            linearc->dphi1, linearc->phi1, linearc->dphi1 / linearc->phi1);
     return TP_ERR_OK;
 }
 
@@ -1191,10 +1208,19 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.R1= tc->coords.circle.xyz.radius;
     linearc.L2 = prev_tc->target;
 
+    linearc.phi1 = tc->coords.circle.xyz.angle;
+
     linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
     tp_debug_print("v_req = %f\n",linearc.v_req);
 
-    lineArcComputeData(&linearc);
+    int res = lineArcComputeData(&linearc);
+    if (res) {
+        return res;
+    }
+
+    linearc.v_actual = fmin(fmax(tpGetRealTargetVel(tp,prev_tc),tpGetRealTargetVel(tp,tc)),linearc.v_plan);
+    tp_debug_print("v_actual = %f\n",linearc.v_actual);
+    tp_debug_print("a_max = %f\n",linearc.a_max);
 
     // Setup blend arc from linearc data
     arcInitFromPoints(&blend_tc->coords.arc.xyz,
@@ -1206,6 +1232,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 
     //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
+    tp_debug_print("check: v_actual = %f, v_plan = %f\n",linearc.v_actual,linearc.v_plan);
 
     //Update tc
     double new_angle = tc->coords.circle.xyz.angle - linearc.dphi1;
@@ -1247,9 +1274,14 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.R1= prev_tc->coords.circle.xyz.radius;
     linearc.L2 = tc->target;
 
+    linearc.phi1 = prev_tc->coords.circle.xyz.angle;
+
     linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
 
-    lineArcComputeData(&linearc);
+    int res = lineArcComputeData(&linearc);
+    if (res) {
+        return res;
+    }
     //Setup actual velocity
     linearc.v_actual = fmin(fmax(tpGetRealTargetVel(tp,prev_tc),tpGetRealTargetVel(tp,tc)),linearc.v_plan);
     tp_debug_print("v_actual = %f\n",linearc.v_actual);
@@ -1267,10 +1299,16 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
 
     //Update prev tc
+    tp_debug_print("old angle = %f\n",prev_tc->coords.circle.xyz.angle);
     double new_angle = prev_tc->coords.circle.xyz.angle - linearc.dphi1;
-    pmCircleStretch(&prev_tc->coords.circle.xyz, new_angle, 0);
+    tp_debug_print("desired angle = %f\n",new_angle);
+    int err = pmCircleStretch(&prev_tc->coords.circle.xyz, new_angle, 0);
+    if (err) {
+        return TP_ERR_FAIL;
+    }
     prev_tc->target = prev_tc->coords.circle.xyz.radius * prev_tc->coords.circle.xyz.angle;
     prev_tc->term_cond = TC_TERM_COND_TANGENT;
+    tp_debug_print("new angle = %f\n",prev_tc->coords.circle.xyz.angle);
 
     //Update tc
     double new_len = tc->coords.line.xyz.tmag - linearc.d;

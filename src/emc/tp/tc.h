@@ -181,6 +181,7 @@ typedef struct {
     PmCartesian Q2;
     PmCartesian C;
     double R1;
+    double phi1;
     double tolerance;
     double L2;
     double v_req;
