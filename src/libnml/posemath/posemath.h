@@ -650,7 +650,6 @@ extern "C" {
 	double radius;
 	double angle;
 	double spiral;
-    double inscr_ratio;
 
     } PmCircle;
 

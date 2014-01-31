@@ -1055,7 +1055,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
  
     // Check for coplanarity
     // arc-line equations
-    PmCartesian n2,binormal;
+    PmCartesian n2, binormal;
 
     pmCartCartCross(&linearc->u1, &linearc->u2, &binormal);
     pmCartUnitEq(&binormal);
@@ -1064,8 +1064,11 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     int convex = tpLineArcConvexTest(&linearc->C1,&linearc->P,&linearc->u2);
     double sgn = 1.0;
     if (convex) {
+        tp_debug_print("Arc is convex wrt. line\n");
         sgn=-1.0;
-    } 
+    } else {
+        tp_debug_print("Arc is concave wrt. line\n");
+    }
 
     //Parallel and perp. components of P-C1
     PmCartesian r_C1P;
@@ -1075,6 +1078,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     double a, b;
     pmCartCartDot(&r_C1P, &linearc->u2, &a);
     pmCartCartDot(&r_C1P, &n2, &b);
+    tp_debug_print("r_C1P components: a = %f, b = %f\n",a,b);
 
     double d_tol;
     int err = tpFindArcLineDist(a, b, linearc->R1, linearc->tolerance, convex, &d_tol);
@@ -1160,7 +1164,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
 }
 
 
-STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc)
+STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, TC_STRUCT * const tc, TC_STRUCT * const blend_tc)
 {
 
     //TODO bail if there is spiral or helix
@@ -1188,9 +1192,29 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const pr
 
     lineArcComputeData(&linearc);
 
+    // Setup blend arc from linearc data
+    arcInitFromPoints(&blend_tc->coords.arc.xyz,
+            &linearc.Q2,
+            &linearc.Q1,
+            &linearc.C);
+    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.line.abc.end, &tc->coords.line.abc.start);
+    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.line.uvw.end, &tc->coords.line.uvw.start);
 
-    //FIXME fail out for now until formulas are right
-    return TP_ERR_FAIL;
+    //Initialize speeds and such
+    tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
+
+    //Update tc
+    double new_angle = tc->coords.circle.xyz.angle - linearc.dphi1;
+    pmCircleStretch(&tc->coords.circle.xyz, new_angle, 1);
+    tc->target = tc->coords.circle.xyz.radius * tc->coords.circle.xyz.angle;
+
+    //Update tc
+    double new_len = prev_tc->coords.line.xyz.tmag - linearc.d;
+    pmCartLineStretch(&prev_tc->coords.line.xyz, new_len, 0);
+    prev_tc->target = new_len;
+    prev_tc->term_cond = TC_TERM_COND_TANGENT;
+
+    return TP_ERR_OK;
 }
 
 
@@ -1200,6 +1224,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     //TODO bail if there is spiral or helix
     double dot;
     tp_debug_print("*-*-*-*-*-*-*-*-*-*-\n");
+    tp_debug_print("in tpCreateLineArcBlend\n");
 
     LineArcData linearc;
 
@@ -1847,7 +1872,6 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
             res = tpCreateLineLineBlend(tp, prev_tc, tc, &blend_tc);
             break;
         case BLEND_LINE_ARC:
-            return TP_ERR_FAIL;
             res = tpCreateLineArcBlend(tp, prev_tc, tc, &blend_tc);
             break;
         case BLEND_ARC_LINE:

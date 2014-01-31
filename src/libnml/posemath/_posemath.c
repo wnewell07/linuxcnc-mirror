@@ -1698,9 +1698,9 @@ int pmCartLineStretch(PmCartLine * const line, double new_len, int from_end)
 
     if (from_end) {
         // Store the new relative position from end in the start point
-        r1 = pmCartScalMult(&line->uVec, new_len, &line->start);
+        r1 = pmCartScalMult(&line->uVec, -new_len, &line->start);
         // Offset the new start point by the current end point
-        r2 = pmCartCartAdd(&line->start, &line->end, &line->start);
+        r2 = pmCartCartAddEq(&line->start, &line->end);
     } else {
         // Store the new relative position from start in the end point:
         r1 = pmCartScalMult(&line->uVec, new_len, &line->end);
@@ -1910,8 +1910,21 @@ int pmCirclePoint(PmCircle const * const circle, double angle, PmCartesian * con
 int pmCircleStretch(PmCircle * const circ, double new_angle, int from_end)
 {
 
+    double mag = 0;
+    pmCartMagSq(&circ->rHelix, &mag);
+    if ( mag > 1e-8 ||
+            fabs(circ->spiral) > 1e-8) {
+        //Can't handle helices or spirals
+        return PM_ERR;
+    }
     if (from_end) {
         //Not implemented yet, way more reprocessing...
+        PmCartesian new_start;
+        double start_angle = circ->angle - new_angle;
+        pmCirclePoint(circ, start_angle, &new_start);
+        pmCartCartSub(&new_start, &circ->center, &circ->rTan);
+        pmCartCartCross(&circ->normal, &circ->rTan, &circ->rPerp);
+
         return PM_ERR;
     } else {
         // Easy to grow / shrink from start
