@@ -1131,6 +1131,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
 
     //Store velocity
     linearc->v_plan = v_upper;
+    tp_debug_print("v_upper = %f\n", v_upper);
 
     //Find the blend arc's center
     /*double C = P + d_upper*u2 + R_upper*n2*/
@@ -1167,6 +1168,8 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
 STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, TC_STRUCT * const tc, TC_STRUCT * const blend_tc)
 {
 
+    tp_debug_print("*-*-*-*-*-*-*-*-*-*-\n");
+    tp_debug_print("in tpCreateLineArcBlend\n");
     //TODO bail if there is spiral or helix
     double dot;
 
@@ -1181,14 +1184,15 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     }
     tcGetEndTangentUnitVector(prev_tc, &linearc.u2);
     tcGetStartTangentUnitVector(tc, &linearc.u1);
-    pmCartScalMult(&linearc.u1,-1,&linearc.u1);
-    pmCartScalMult(&linearc.u2,-1,&linearc.u2);
+    pmCartScalMult(&linearc.u1, -1, &linearc.u1);
+    pmCartScalMult(&linearc.u2, -1, &linearc.u2);
     linearc.P = prev_tc->coords.line.xyz.end;
     linearc.C1 = tc->coords.circle.xyz.center;
     linearc.R1= tc->coords.circle.xyz.radius;
     linearc.L2 = prev_tc->target;
 
     linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
+    tp_debug_print("v_req = %f\n",linearc.v_req);
 
     lineArcComputeData(&linearc);
 
@@ -1197,8 +1201,8 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &linearc.Q2,
             &linearc.Q1,
             &linearc.C);
-    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.line.abc.end, &tc->coords.line.abc.start);
-    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.line.uvw.end, &tc->coords.line.uvw.start);
+    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.line.abc.end, &tc->coords.circle.abc.start);
+    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.line.uvw.end, &tc->coords.circle.uvw.start);
 
     //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
@@ -1224,10 +1228,10 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     //TODO bail if there is spiral or helix
     double dot;
     tp_debug_print("*-*-*-*-*-*-*-*-*-*-\n");
-    tp_debug_print("in tpCreateLineArcBlend\n");
+    tp_debug_print("in tpCreateArcLineBlend\n");
 
     LineArcData linearc;
-
+ 
     linearc.tolerance = tcFindBlendTolerance(prev_tc, tc);
 
     pmCartCartDot(&prev_tc->coords.circle.xyz.normal, &tc->coords.line.xyz.uVec, &dot);
@@ -1256,8 +1260,8 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &linearc.Q1,
             &linearc.Q2,
             &linearc.C);
-    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.circle.abc.end, &tc->coords.circle.abc.start);
-    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.circle.uvw.end, &tc->coords.circle.uvw.start);
+    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.circle.abc.end, &tc->coords.line.abc.start);
+    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.circle.uvw.end, &tc->coords.line.uvw.start);
 
     //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);

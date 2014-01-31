@@ -1924,8 +1924,7 @@ int pmCircleStretch(PmCircle * const circ, double new_angle, int from_end)
         pmCirclePoint(circ, start_angle, &new_start);
         pmCartCartSub(&new_start, &circ->center, &circ->rTan);
         pmCartCartCross(&circ->normal, &circ->rTan, &circ->rPerp);
-
-        return PM_ERR;
+        circ->angle = new_angle;
     } else {
         // Easy to grow / shrink from start
         circ->angle = new_angle;
