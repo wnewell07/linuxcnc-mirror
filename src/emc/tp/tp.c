@@ -1108,7 +1108,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
         d_arc = linearc->R1 * sin(gamma);
     }
     //Find distance bounded by length of line move
-    double d_line = linearc->L2 * 0.5;
+    double d_line = linearc->L2;
     tp_debug_print("d_arc = %f, d_tol = %f, d_line = %f\n",d_arc,d_tol,d_line);
 
     double d_geom = fmin(fmin(d_line,d_tol),d_arc);
@@ -1287,7 +1287,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.P = tc->coords.line.xyz.start;
     linearc.C1 = prev_tc->coords.circle.xyz.center;
     linearc.R1= prev_tc->coords.circle.xyz.radius;
-    linearc.L2 = tc->target;
+    linearc.L2 = tc->target / 2.0;
 
     linearc.phi1 = prev_tc->coords.circle.xyz.angle * 2.0 / 3.0;
 
