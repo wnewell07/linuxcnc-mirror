@@ -972,7 +972,9 @@ STATIC int tpFindArcLineDist(double a, double b, double R1, double T,
     /* Compute distance along line segment where tangent arc with tolerance T will hit.*/
     /*   a = (P-C1) . u2*/
     /*   b = (P-C1) . n2*/
-
+    if (!d) {
+        return TP_ERR_MISSING_OUTPUT;
+    }
     double sgn = 1.0;
     if (convex) {
         sgn=-1.0;
@@ -980,31 +982,33 @@ STATIC int tpFindArcLineDist(double a, double b, double R1, double T,
 
     double A = T/(b-sgn*R1)-1.0;
     double B = T*a/(b-sgn*R1);
-    double C = pmSqrt(T);;
+    double C = pmSq(T);;
 
-    double d0=0;
-    double d1=0;
+    double d0 = 0;
+    double d1 = 0;
 
-    quadraticFormula(A, B, C, &d0, &d1);
+    int err = quadraticFormula(A, B, C, &d0, &d1);
     if (d0>0 && d1>0) {
         *d=fmin(d0,d1);
     } else {
         *d=fmax(d0,d1);
     }
-    return TP_ERR_OK;
+    return err;
 
 }
 
 STATIC int tpFindRadiusFromDist(double a, double b, double R1, double d, int convex, double * const R)
 {
-    //For the arc-line case, when a distance d is specified, find the corresponding radius
-    double sgn = 1.0;
-    if (convex) {
-        sgn = -1;
+
+    if (!R) {
+        return TP_ERR_MISSING_OUTPUT;
     }
+    //For the arc-line case, when a distance d is specified, find the corresponding radius
+    double sgn = convex ? -1.0 : 1.0;
 
     double den = (R1-sgn*b);
     if (fabs(den) < TP_POS_EPSILON) {
+        tp_debug_print("den = %g, near 0\n", den);
         return TP_ERR_FAIL;
     }
 
@@ -1016,6 +1020,9 @@ STATIC int tpFindRadiusFromDist(double a, double b, double R1, double d, int con
 
 STATIC int tpFindDistFromRadius(double a, double b, double R1, double R, int convex, double * const d)
 {
+    if (!d) {
+        return TP_ERR_MISSING_OUTPUT;
+    }
     double sgn = 1.0;
     if (convex) {
         sgn=-1;
@@ -1026,13 +1033,13 @@ STATIC int tpFindDistFromRadius(double a, double b, double R1, double R, int con
     double d0=0;
     double d1=0;
 
-    quadraticFormula(1.0,2.0*a,K1-K2+pmSq(a),&d0,&d1);
+    int err = quadraticFormula(1.0,2.0*a,K1-K2+pmSq(a),&d0,&d1);
     if (d0>0 && d1>0){
         *d=fmin(d0,d1);
     } else {
         *d=fmax(d0,d1);
     }
-    return TP_ERR_OK;
+    return err;
 }
 
 
@@ -1088,9 +1095,16 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
 
     double d_arc = 0;
     if (!convex) {
-        d_arc = linearc->phi1 * linearc->R1 / 2.0;
+        //phi1 is the blendable length
+        d_arc = linearc->phi1 * linearc->R1;
     } else {
-        return TP_ERR_FAIL;
+        //Calculate "beta" angle = deviation from tangent
+        // Find minimum angle for convex case
+        double dot;
+        pmCartCartDot(&linearc->u1, &linearc->u2, &dot);
+        double angle_from_tan = acos(dot);
+        double gamma = fmin(PM_PI - angle_from_tan, linearc->phi1);
+        d_arc = linearc->R1 * sin(gamma);
     }
     //Find distance bounded by length of line move
     double d_line = linearc->L2 * 0.5;
@@ -1208,7 +1222,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.R1= tc->coords.circle.xyz.radius;
     linearc.L2 = prev_tc->target;
 
-    linearc.phi1 = tc->coords.circle.xyz.angle;
+    linearc.phi1 = tc->coords.circle.xyz.angle/3.0;
 
     linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
     tp_debug_print("v_req = %f\n",linearc.v_req);
@@ -1274,7 +1288,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     linearc.R1= prev_tc->coords.circle.xyz.radius;
     linearc.L2 = tc->target;
 
-    linearc.phi1 = prev_tc->coords.circle.xyz.angle;
+    linearc.phi1 = prev_tc->coords.circle.xyz.angle * 2.0 / 3.0;
 
     linearc.v_req = fmax(tpGetMaxTargetVel(tp,prev_tc), tpGetMaxTargetVel(tp,tc));
 
