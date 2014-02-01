@@ -1028,12 +1028,13 @@ STATIC int tpFindDistFromRadius(double a, double b, double R1, double R, int con
         sgn=-1;
     }
 
-    double K1=pmSq(b+R);
-    double K2=pmSq(R1+sgn*R);
+    double A = 1.0;
+    double B = 2.0*a;
+    double C = 2.0*(-sgn * R1 + b) * R;
     double d0=0;
     double d1=0;
 
-    int err = quadraticFormula(1.0,2.0*a,K1-K2+pmSq(a),&d0,&d1);
+    int err = quadraticFormula(A,B,C,&d0,&d1);
     if (d0>0 && d1>0){
         *d=fmin(d0,d1);
     } else {
