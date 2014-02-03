@@ -1207,7 +1207,8 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 
     LineArcData linearc;
 
-    linearc.tolerance = tcFindBlendTolerance(prev_tc, tc);
+    double nominal_tolerance;
+    tcFindBlendTolerance(prev_tc,tc,&linearc.tolerance,&nominal_tolerance);
 
     pmCartCartDot(&tc->coords.circle.xyz.normal, &prev_tc->coords.line.xyz.uVec, &dot);
     if (dot > TP_POS_EPSILON) {
@@ -1242,8 +1243,8 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &linearc.Q2,
             &linearc.Q1,
             &linearc.C);
-    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.line.abc.end, &tc->coords.circle.abc.start);
-    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.line.uvw.end, &tc->coords.circle.uvw.start);
+    blend_tc->coords.arc.abc=prev_tc->coords.line.abc.end;
+    blend_tc->coords.arc.uvw=prev_tc->coords.line.uvw.end;
 
     //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
@@ -1274,7 +1275,8 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 
     LineArcData linearc;
  
-    linearc.tolerance = tcFindBlendTolerance(prev_tc, tc);
+    double nominal_tolerance;
+    tcFindBlendTolerance(prev_tc,tc,&linearc.tolerance,&nominal_tolerance);
 
     pmCartCartDot(&prev_tc->coords.circle.xyz.normal, &tc->coords.line.xyz.uVec, &dot);
     if (dot > TP_POS_EPSILON) {
@@ -1307,8 +1309,9 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &linearc.Q1,
             &linearc.Q2,
             &linearc.C);
-    pmCartLineInit(&blend_tc->coords.arc.abc, &prev_tc->coords.circle.abc.end, &tc->coords.line.abc.start);
-    pmCartLineInit(&blend_tc->coords.arc.uvw, &prev_tc->coords.circle.uvw.end, &tc->coords.line.uvw.start);
+
+    blend_tc->coords.arc.abc=tc->coords.line.abc.start;
+    blend_tc->coords.arc.uvw=tc->coords.line.uvw.start;
 
     //Initialize speeds and such
     tpInitBlendArc(tp, prev_tc, blend_tc, linearc.v_actual, linearc.v_plan, linearc.a_max);
