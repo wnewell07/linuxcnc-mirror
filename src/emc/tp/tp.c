@@ -1043,20 +1043,17 @@ STATIC int tpFindDistFromRadius(double a, double b, double R1, double R, int con
     return err;
 }
 
-
-STATIC int tpLineArcConvexTest(PmCartesian const * const C1,
-        PmCartesian const * const P, PmCartesian const * const u2)
+STATIC int tpArcConvexTest(PmCartesian const * const center,
+        PmCartesian const * const P, PmCartesian const * const uVec, bool reverse_dir)
 {
     //Check if an arc-line intersection is concave or convex
     double dot;
     PmCartesian diff;
-    pmCartCartSub(P,C1,&diff);
-    pmCartCartDot(&diff, u2, &dot);
-    if (dot > 0) {
-        return 0;
-    } else {
-        return 1;
-    }
+    pmCartCartSub(P, center, &diff);
+    pmCartCartDot(&diff, uVec, &dot);
+
+    int convex = reverse_dir ^ (dot < 0);
+    return convex;
 }
 
 STATIC int lineArcComputeData(LineArcData * const linearc) {
@@ -1069,7 +1066,7 @@ STATIC int lineArcComputeData(LineArcData * const linearc) {
     pmCartUnitEq(&binormal);
     pmCartCartCross(&binormal, &linearc->u2, &n2);
 
-    int convex = tpLineArcConvexTest(&linearc->C1,&linearc->P,&linearc->u2);
+    bool convex = tpArcConvexTest(&linearc->C1,&linearc->P,&linearc->u2, false);
     double sgn = 1.0;
     if (convex) {
         tp_debug_print("Arc is convex wrt. line\n");
