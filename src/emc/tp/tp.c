@@ -1259,7 +1259,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     double new_len = prev_tc->coords.line.xyz.tmag - linearc.d;
     pmCartLineStretch(&prev_tc->coords.line.xyz, new_len, 0);
     prev_tc->target = new_len;
-    prev_tc->term_cond = TC_TERM_COND_TANGENT;
+    tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
 
     return TP_ERR_OK;
 }
@@ -1325,14 +1325,14 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
         return TP_ERR_FAIL;
     }
     prev_tc->target = prev_tc->coords.circle.xyz.radius * prev_tc->coords.circle.xyz.angle;
-    prev_tc->term_cond = TC_TERM_COND_TANGENT;
+    tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
     tp_debug_print("new angle = %f\n",prev_tc->coords.circle.xyz.angle);
 
     //Update tc
     double new_len = tc->coords.line.xyz.tmag - linearc.d;
     pmCartLineStretch(&tc->coords.line.xyz, new_len, 1);
     tc->target = new_len;
-    //FIXME fail out for now until formulas are right
+    tp_debug_print("arc-line calculations complete\n");
     return TP_ERR_OK;
 }
 
@@ -2026,9 +2026,6 @@ int tpAddLine(TP_STRUCT * const tp, EmcPose end, int type, double vel, double
     }
     tcCheckLastParabolic(&tc, prev_tc);
     tpFinalizeSegmentLength(tp, prev_tc);
-
-    //Flag this as blending with previous segment if the previous segment is
-    //set to blend with this one
 
     int retval = tpAddSegmentToQueue(tp, &tc, true);
     //Run speed optimization (will abort safely if there are no tangent segments)
