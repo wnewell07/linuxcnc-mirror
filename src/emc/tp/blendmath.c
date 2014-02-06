@@ -708,12 +708,14 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     // From the guessed center, find the minimum radius required to intersect the circles
     double R_final = fmin(d_guess1 - circ1->radius, d_guess2 - circ2->radius);
-    tp_debug_print("d_guess1 = %f, d_gess2 = %f\n", d_guess1, d_guess2);
+    tp_debug_print("d_guess1 = %f, d_guess2 = %f\n", d_guess1, d_guess2);
     tp_debug_print("R_final = %f, R_guess = %f\n", R_final, param->R_plan);
 
     // Define distances from actual center to circle centers
     double d1 = circ1->radius + R_final;
     double d2 = circ2->radius + R_final;
+    tp_debug_print("d1 = %f, d2 = %f\n", d1, d2);
+
 
     //Find "x" distance between C1 and C2
     PmCartesian r_C1C2;
@@ -798,7 +800,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     PmCartesian r_C2P;
     pmCartCartSub(&geom->P, &circ2->center, &r_C2P);
     pmCartCartDot(&r_C2P, &r_C2C, &dot);
-    double dphi2=acos(dot / (circ1->radius * d2));
+    double dphi2=acos(dot / (circ2->radius * d2));
 
     tp_debug_print("dphi1 = %f, dphi2 = %f\n", dphi1, dphi2);
 
