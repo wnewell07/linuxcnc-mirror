@@ -413,7 +413,8 @@ int bmLineArcProcess(LineArcData * const data)
  * Copy over parameters into LineLineData struct.
  * This function initializes the LineLineData stuct from existing line segments
  */
-int bmLineLineInit(LineLineData * const data, TC_STRUCT const * const prev_tc,
+int blendInit3(BlendGeom3 * const geom, BlendParameters * const param,
+        TC_STRUCT const * const prev_tc,
         TC_STRUCT const * const tc,
         PmCartesian const * const acc_bound,
         PmCartesian const * const vel_bound,
@@ -421,79 +422,81 @@ int bmLineLineInit(LineLineData * const data, TC_STRUCT const * const prev_tc,
 {
     
     //Copy over unit vectors
-    data->u1 = prev_tc->coords.line.xyz.uVec;
-    data->u2 = tc->coords.line.xyz.uVec;
+    geom->u1 = prev_tc->coords.line.xyz.uVec;
+    geom->u2 = tc->coords.line.xyz.uVec;
 
-    data->P = prev_tc->coords.line.xyz.end;
+    geom->P = prev_tc->coords.line.xyz.end;
 
     //Calculate angles between lines
-    int res = findIntersectionAngle(&data->u1,
-            &data->u2, &data->theta);
+    int res = findIntersectionAngle(&geom->u1,
+            &geom->u2, &param->theta);
     if (res) {
         return TP_ERR_FAIL;
     }
-    tp_debug_print("theta = %f\n", data->theta);
+    tp_debug_print("theta = %f\n", param->theta);
 
-    data->phi = (PM_PI - data->theta * 2.0);
+    param->phi = (PM_PI - param->theta * 2.0);
+
+    //Do normal calculation here since we need this information for accel / vel limits
+    blendCalculateNormals3(geom);
 
     // Calculate max acceleration based on plane containing lines
-    calculateInscribedDiameter(&data->binormal, acc_bound, &data->a_max);
+    calculateInscribedDiameter(&geom->binormal, acc_bound, &param->a_max);
 
     // Store max normal acceleration
-    data->a_n_max = data->a_max * TP_ACC_RATIO_NORMAL;
-    tp_debug_print("a_max = %f, a_n_max = %f\n", data->a_max,
-            data->a_n_max);
+    param->a_n_max = param->a_max * TP_ACC_RATIO_NORMAL;
+    tp_debug_print("a_max = %f, a_n_max = %f\n", param->a_max,
+            param->a_n_max);
 
     //Find common velocity and acceleration
-    data->v_req = fmin(prev_tc->reqvel, tc->reqvel);
-    data->v_goal = data->v_req * maxFeedScale;
+    param->v_req = fmin(prev_tc->reqvel, tc->reqvel);
+    param->v_goal = param->v_req * maxFeedScale;
 
     //Calculate the maximum planar velocity
     double v_max;
-    calculateInscribedDiameter(&data->binormal, vel_bound, &v_max);
-    data->v_goal = fmin(data->v_goal, v_max);
+    calculateInscribedDiameter(&geom->binormal, vel_bound, &v_max);
+    param->v_goal = fmin(param->v_goal, v_max);
 
     tp_debug_print("vr1 = %f, vr2 = %f\n", prev_tc->reqvel, tc->reqvel);
-    tp_debug_print("v_goal = %f, max scale = %f\n", data->v_goal, maxFeedScale);
+    tp_debug_print("v_goal = %f, max scale = %f\n", param->v_goal, maxFeedScale);
 
     //FIXME greediness really should be 0.5 anyway
     const double greediness = 0.5;
     //Nominal length restriction prevents gobbling too much of parabolic blends
-    data->L1 = fmin(prev_tc->target, prev_tc->nominal_length * greediness);
-    data->L2 = tc->target * greediness;
+    param->L1 = fmin(prev_tc->target, prev_tc->nominal_length * greediness);
+    param->L2 = tc->target * greediness;
     tp_debug_print("prev. nominal length = %f, next nominal_length = %f\n",
             prev_tc->nominal_length, tc->nominal_length);
-    tp_debug_print("L1 = %f, L2 = %f\n", data->L1, data->L2);
+    tp_debug_print("L1 = %f, L2 = %f\n", param->L1, param->L2);
 
-    //TODO get tolerance from blend here 
     double nominal_tolerance;
-    tcFindBlendTolerance(prev_tc, tc, &data->tolerance, &nominal_tolerance);
+    tcFindBlendTolerance(prev_tc, tc, &param->tolerance, &nominal_tolerance);
+
     return TP_ERR_OK;
 }
-
 
 /**
  * Calculate plane normal and binormal based on unit direction vectors.
  */
-int bmLineLineCalculateNormals(LineLineData * const data)
+int blendCalculateNormals3(BlendGeom3 * const geom)
 {
 
-    pmCartCartCross(&data->u1,
-            &data->u2,
-            &data->binormal);
-    pmCartUnitEq(&data->binormal);
+    int err_cross = pmCartCartCross(&geom->u1,
+            &geom->u2,
+            &geom->binormal);
+    int err_unit_b = pmCartUnitEq(&geom->binormal);
 
-    tp_debug_print("binormal = [%f %f %f]\n", data->binormal.x,
-            data->binormal.y,
-            data->binormal.z);
+    tp_debug_print("binormal = [%f %f %f]\n", geom->binormal.x,
+            geom->binormal.y,
+            geom->binormal.z);
 
-    pmCartCartSub(&data->u2, &data->u1, &data->normal);
-    pmCartUnitEq(&data->normal);
+    pmCartCartSub(&geom->u2, &geom->u1, &geom->normal);
+    int err_unit_n = pmCartUnitEq(&geom->normal);
 
-    tp_debug_print("normal = [%f %f %f]\n", data->normal.x,
-            data->normal.y,
-            data->normal.z);
-    return 0;
+    tp_debug_print("normal = [%f %f %f]\n", geom->normal.x,
+            geom->normal.y,
+            geom->normal.z);
+    return (err_cross || err_unit_b || err_unit_n);
 }
 
 /**
@@ -502,47 +505,56 @@ int bmLineLineCalculateNormals(LineLineData * const data)
  * parameters are later used to create the actual arc geometry in other
  * functions.
  */
-int bmLineLineParameters(LineLineData * const data)
+int blendComputeParameters(BlendParameters * const param)
 {
 
-    double h_tol = data->tolerance / (1.0 - sin(data->theta));
-    double d_tol = cos(data->theta) * h_tol;
-    // Debug output for tolerances
-    tp_debug_print(" d_tol = %f\n",d_tol);
+    // Find maximum distance h from arc center to intersection point
+    double h_tol = param->tolerance / (1.0 - sin(param->theta));
 
-    //Find min length due to segment limits
-    double d_lengths = fmin(data->L1, data->L2);
+    // Find maximum distance along lines allowed by tolerance
+    double d_tol = cos(param->theta) * h_tol;
+    tp_debug_print(" d_tol = %f\n", d_tol);
+
+    // Find minimum distance by blend length constraints
+    double d_lengths = fmin(param->L1, param->L2);
     double d_geom = fmin(d_lengths, d_tol); 
-    double R_geom = tan(data->theta) * d_geom;
+    // Find radius from the limiting length
+    double R_geom = tan(param->theta) * d_geom;
 
-    double v_normal = pmSqrt(data->a_n_max * R_geom);
+    // Find maximum velocity allowed by accel and radius
+    double v_normal = pmSqrt(param->a_n_max * R_geom);
     tp_debug_print("v_normal = %f\n", v_normal);
 
-    data->v_plan = v_normal;
-    data->R_plan = R_geom;
+    param->v_plan = fmin(v_normal, param->v_goal);
+    param->R_plan = pmSq(param->v_plan) / param->a_n_max;
+    param->d_plan = param->R_plan / tan(param->theta);
 
-    // If our goal velocity is lower, reduce the arc size proportionally
-    if (v_normal > data->v_goal) {
-        data->v_plan = data->v_goal;
-        tp_debug_print("v_goal = %f\n", data->v_goal);
-        //At this new limiting velocity, find the radius by the reverse formula
-        data->R_plan = pmSq(data->v_plan) / data->a_n_max;
-    }
-    tp_debug_print("R_plan = %f\n", data->R_plan);
-    data->d_plan = data->R_plan / tan(data->theta);
+    tp_debug_print("v_plan = %f\n", param->v_plan);
+    tp_debug_print("R_plan = %f\n", param->R_plan);
+    tp_debug_print("d_plan = %f\n", param->d_plan);
 
-    tp_debug_print("v_plan = %f\n", data->v_plan);
-
-    //Now we store the "actual" velocity. Recall that v_plan may be greater
-    //than v_req by the max feed override. If our worst-case planned velocity is higher than the requested velocity, then clip at the requested velocity. This allows us to increase speed above the feed override limits
-    if (data->v_plan > data->v_req) {
-        data->v_actual = data->v_req;
+    /* "Actual" velocity means the velocity when feed override is 1.0.  Recall
+     * that v_plan may be greater than v_req by the max feed override. If our
+     * worst-case planned velocity is higher than the requested velocity, then
+     * clip at the requested velocity. This allows us to increase speed above
+     * the feed override limits.
+     */
+    if (param->v_plan > param->v_req) {
+        param->v_actual = param->v_req;
     } else {
-        data->v_actual = data->v_plan;
+        param->v_actual = param->v_plan;
     }
 
-    if (data->R_plan < TP_POS_EPSILON) {
-        tp_debug_print("#Blend radius too small, aborting...\n");
+    // Store arc length of blend arc for future checks
+    param->s_arc = param->R_plan * param->phi;
+
+    if (param->R_plan < TP_POS_EPSILON) {
+        tp_debug_print("#Blend radius too small, aborting arc\n");
+        return TP_ERR_FAIL;
+    }
+
+    if (param->s_arc < TP_MIN_ARC_LENGTH) {
+        tp_debug_print("#Blend arc length too small, aborting arc\n");
         return TP_ERR_FAIL;
     }
     return TP_ERR_OK;
@@ -550,17 +562,17 @@ int bmLineLineParameters(LineLineData * const data)
 
 
 /** Check if the previous line segment will be consumed based on the blend arc parameters. */
-int bmLineLineCheckConsume(LineLineData * const data,
+int blendCheckConsume(BlendParameters * const param,
         TC_STRUCT const * const prev_tc, int gap_cycles)
 {
     if (!prev_tc) {
         return -1;
     }
     //Check for segment length limits
-    double L_prev = prev_tc->target - data->d_plan;
-    double prev_seg_time = L_prev / data->v_plan;
+    double L_prev = prev_tc->target - param->d_plan;
+    double prev_seg_time = L_prev / param->v_plan;
 
-    data->consume = (prev_seg_time < gap_cycles * prev_tc->cycle_time);
+    param->consume = (prev_seg_time < gap_cycles * prev_tc->cycle_time);
     return 0;
 }
 
@@ -570,42 +582,44 @@ int bmLineLineCheckConsume(LineLineData * const data,
  * Once blend parameters are computed, the three arc points are calculated
  * here.
  */
-int bmLineLinePoints(LineLineData * const data)
+int blendFindPoints3(BlendPoints3 * const points, BlendGeom3 const * const geom,
+        BlendParameters const * const param)
 {
-    //Find center of blend arc along normal vector
-    double h_plan = data->R_plan / sin(data->theta);
-    tp_debug_print("h_plan = %f\n",h_plan);
-    pmCartScalMult(&data->normal, h_plan, &data->arc_center );
-    pmCartCartAddEq(&data->arc_center, &data->P);
+    // Find center of blend arc along normal vector
+    double center_dist = param->R_plan / sin(param->theta);
+    tp_debug_print("center_dist = %f\n", center_dist);
+
+    pmCartScalMult(&geom->normal, center_dist, &points->arc_center);
+    pmCartCartAddEq(&points->arc_center, &geom->P);
 
     // Start point is d_plan away from intersection P in the
     // negative direction of u1
-    pmCartScalMult(&data->u1, -data->d_plan, &data->arc_start);
-    pmCartCartAddEq(&data->arc_start, &data->P);
+    pmCartScalMult(&geom->u1, -param->d_plan, &points->arc_start);
+    pmCartCartAddEq(&points->arc_start, &geom->P);
 
     // End point is d_plan away from intersection P in the
     // positive direction of u1
-    pmCartScalMult(&data->u2, data->d_plan, &data->arc_end);
-    pmCartCartAddEq(&data->arc_end, &data->P);
+    pmCartScalMult(&geom->u2, param->d_plan, &points->arc_end);
+    pmCartCartAddEq(&points->arc_end, &geom->P);
     return TP_ERR_OK;
 }
-
 
 /**
  * Setup the spherical arc struct based on the blend arc data.
  */
-int bmArcFromLineLine(SphericalArc * const arc, LineLineData const * const data)
+int arcFromBlendPoints3(SphericalArc * const arc, BlendPoints3 const * const points,
+        BlendGeom3 const * const geom, BlendParameters const * const param)
 {
-
     // If we consume the previous line, the remaining line length gets added here
-    arc->uTan = data->u1;
-    if (data->consume) {
-        arc->line_length = data->L1 - data->d_plan;
+    arc->uTan = geom->u1;
+    if (param->consume) {
+        arc->line_length = param->L1 - param->d_plan;
     } else {
         arc->line_length = 0;
     }
 
-    //Create the arc from the processed points
-    return arcInitFromPoints(arc, &data->arc_start, &data->arc_end, &data->arc_center);
+    // Create the arc from the processed points
+    return arcInitFromPoints(arc, &points->arc_start,
+            &points->arc_end, &points->arc_center);
 }
 

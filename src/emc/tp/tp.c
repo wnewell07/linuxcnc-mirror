@@ -765,6 +765,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT * const blend_tc)
 {
     // Do convexity tests for each arc
+
     /*tcGetEndTangentUnitVector(prev_tc, &u1);*/
     /*tcGetStartTangentUnitVector(tc, &u2);*/
     /*bool convex1 = tpArcConvexTest(&prev_tc->coords.circle.xyz.center, &u1, false);*/
@@ -788,16 +789,18 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
     tpGetMachineAccelBounds(&acc_bound);
     tpGetMachineVelBounds(&vel_bound);
     
-    //TODO initialize here
-    LineLineData data;
-    bmLineLineInit(&data, prev_tc, tc, &acc_bound, &vel_bound, emcmotConfig->maxFeedScale);
-    bmLineLineCalculateNormals(&data);
-    bmLineLineParameters(&data);
-    bmLineLineCheckConsume(&data, prev_tc, emcmotConfig->arcBlendGapCycles);
-    bmLineLinePoints(&data);
+    // Setup blend data structures
+    BlendGeom3 geom;
+    BlendParameters param;
+    BlendPoints3 points;
+
+    blendInit3(&geom, &param, prev_tc, tc, &acc_bound, &vel_bound, emcmotConfig->maxFeedScale);
+    blendComputeParameters(&param);
+    blendCheckConsume(&param, prev_tc, emcmotConfig->arcBlendGapCycles);
+    blendFindPoints3(&points, &geom, &param);
 
     // Set up actual blend arc here
-    bmArcFromLineLine(&blend_tc->coords.arc.xyz, &data);
+    arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points, &geom, &param);
 
     // Note that previous restrictions don't allow ABC or UVW movement, so the
     // end and start points should be identical
@@ -805,11 +808,13 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
     blend_tc->coords.arc.uvw = prev_tc->coords.line.uvw.end;
 
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
-    tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, data.v_actual, data.v_plan, data.a_max);
+    tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
+            param.v_plan, param.a_max);
 
-    int retval = 0;
+    int retval = TP_ERR_FAIL;
 
-    if (data.consume) {
+    //TODO refactor to pass consume to connect function
+    if (param.consume) {
         //Since we're consuming the previous segment, pop the last line off of the queue
         retval = tcqPopBack(&tp->queue);
         tp_debug_print("consume previous line\n");
@@ -819,11 +824,11 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
         }
         //Since the blend arc meets the end of the previous line, we only need
         //to "connect" to the next line
-        retval = tcConnectBlendArc(NULL, tc, &data.arc_start, &data.arc_end);
+        retval = tcConnectBlendArc(NULL, tc, &points.arc_start, &points.arc_end);
     } else {
         tp_debug_print("keeping previous line\n");
         blend_tc->coords.arc.xyz.line_length = 0;
-        retval = tcConnectBlendArc(prev_tc, tc, &data.arc_start, &data.arc_end);
+        retval = tcConnectBlendArc(prev_tc, tc, &points.arc_start, &points.arc_end);
     }
     return retval;
 }
