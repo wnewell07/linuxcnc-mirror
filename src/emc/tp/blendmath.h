@@ -89,39 +89,6 @@ typedef struct {
 } BlendPoints9;
 #endif
 
-#if 0
-typedef struct {
-    PmCartesian u1;     /* unit vector along line 1 */
-    PmCartesian u2;     /* unit vector along line 2 */
-    PmCartesian P;      /* Intersection point */
-    
-    double tolerance;   /* Net blend tolerance (min of line 1 and 2) */
-    double L1;          /* Available part of line 1 to blend over */
-    double L2;          /* Available part of line 2 to blend over */
-    double v_req;       /* requsted velocity for the blend arc */
-    double a_max;       /* max acceleration allowed for blend */
-
-    // These fields are considered "output"
-    double theta;       /* Intersection angle, half of angle between -u1 and u2 */
-    double phi;         /* supplement of intersection angle, angle between u1 and u2 */
-    double a_n_max;     /* max normal acceleration allowed */
-    PmCartesian arc_start;     /* start point for blend arc */
-    PmCartesian arc_end;     /* end point for blend arc */
-    PmCartesian arc_center;     /* center point for blend arc */
-
-    double R_plan;      /* planned radius for blend arc */
-    double d_plan;      /* distance along each line to Q1, Q2 */
-
-    double v_goal;      /* desired velocity at max feed override */
-    double v_plan;      /* planned max velocity at max feed override */
-    double v_actual;    /* velocity at feedscale = 1.0 */
-    int consume;        /* Consume the previous segment */
-
-    PmCartesian normal;
-    PmCartesian binormal;
-} LineLineData;
-#endif
-
 double fsign(double f);
 
 int clip_min(double * const x, double min);
@@ -140,7 +107,7 @@ double pmCartMin(PmCartesian const * const in);
 int calculateInscribedDiameter(PmCartesian const * const normal,
         PmCartesian const * const bounds, double * const diameter);
 
-int blendInit3(BlendGeom3 * const geom, BlendParameters * const param,
+int blendInit3FromLines(BlendGeom3 * const geom, BlendParameters * const param,
         TC_STRUCT const * const prev_tc,
         TC_STRUCT const * const tc,
         PmCartesian const * const acc_bound,
@@ -156,6 +123,17 @@ int blendCheckConsume(BlendParameters * const param,
 
 int blendFindPoints3(BlendPoints3 * const points, BlendGeom3 const * const geom,
         BlendParameters const * const param);
+
+int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
+        TC_STRUCT const * const prev_tc,
+        TC_STRUCT const * const tc,
+        PmCartesian const * const acc_bound,
+        PmCartesian const * const vel_bound,
+        double maxFeedScale);
+
+int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * const points_in,
+        BlendParameters * const param, BlendGeom3 const * const geom,
+        PmCircle const * const circ1, PmCircle const * const circ2);
 
 int arcFromBlendPoints3(SphericalArc * const arc, BlendPoints3 const * const points,
         BlendGeom3 const * const geom, BlendParameters const * const param);

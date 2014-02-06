@@ -766,14 +766,33 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT const * const pre
 {
     // Do convexity tests for each arc
 
-    /*tcGetEndTangentUnitVector(prev_tc, &u1);*/
-    /*tcGetStartTangentUnitVector(tc, &u2);*/
-    /*bool convex1 = tpArcConvexTest(&prev_tc->coords.circle.xyz.center, &u1, false);*/
-    /*bool convex2 = tpArcConvexTest(&tc->coords.circle.xyz.center, &u1, true);*/
 
-    /*//Identify max angle for first arc by blend limits and */
-    /*double phi1_max = fmin(prev_tc->coords.circle.xyz.angle / 3.0, PM_PI / 2.0);*/
-    /*double phi2_max = fmin(prev_tc->coords.circle.xyz.angle / 3.0, PM_PI / 2.0);*/
+    PmCartesian acc_bound, vel_bound;
+    
+    //Get machine limits
+    tpGetMachineAccelBounds(&acc_bound);
+    tpGetMachineVelBounds(&vel_bound);
+
+    //Populate blend geometry struct
+    BlendGeom3 geom;
+    BlendParameters param;
+    BlendPoints3 points_approx;
+    BlendPoints3 points_exact;
+
+    blendInit3FromArcs(&geom, &param,
+            prev_tc,
+            tc,
+            &acc_bound,
+            &vel_bound,
+            emcmotConfig->maxFeedScale);
+
+    blendComputeParameters(&param);
+    blendFindPoints3(&points_approx, &geom, &param);
+    blendArcArcPostProcess(&points_approx, 
+            &points_exact,
+            &param, 
+            &geom, &prev_tc->coords.circle.xyz,
+            &tc->coords.circle.xyz);
 
     return TP_ERR_FAIL;
 }
@@ -794,11 +813,19 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
     BlendParameters param;
     BlendPoints3 points;
 
-    blendInit3(&geom, &param, prev_tc, tc, &acc_bound, &vel_bound, emcmotConfig->maxFeedScale);
-    blendComputeParameters(&param);
+    blendInit3FromLines(&geom, &param, 
+            prev_tc,
+            tc,
+            &acc_bound,
+            &vel_bound,
+            emcmotConfig->maxFeedScale);
+    int res_blend = blendComputeParameters(&param);
     blendCheckConsume(&param, prev_tc, emcmotConfig->arcBlendGapCycles);
     blendFindPoints3(&points, &geom, &param);
 
+    if (res_blend != TP_ERR_OK) {
+        return res_blend;
+    }
     // Set up actual blend arc here
     arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points, &geom, &param);
 
@@ -1238,8 +1265,7 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
             return TP_ERR_FAIL;
             break;
         case BLEND_ARC_ARC:
-            return TP_ERR_FAIL;
-            /*res = tpCreateArcArcBlend(tp, prev_tc, tc, &blend_tc);*/
+            res = tpCreateArcArcBlend(tp, prev_tc, tc, &blend_tc);
             break;
         default:
             tp_debug_print("blend arc NOT created\n");
