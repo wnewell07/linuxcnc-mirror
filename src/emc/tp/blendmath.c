@@ -805,7 +805,12 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     tp_debug_print("dphi1 = %f, dphi2 = %f\n", dphi1, dphi2);
 
     points->trim1 = dphi1;
-    points->trim2 = dphi1;
+    points->trim2 = dphi2;
+
+    //Update param structure with new values
+    param->R_plan = R_final;
+    param->v_plan = pmSqrt(param->R_plan * param->a_n_max);
+    param->v_actual = fmin(param->v_plan, param->v_actual);
 
     return TP_ERR_OK;
 
