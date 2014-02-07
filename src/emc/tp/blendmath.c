@@ -460,6 +460,8 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         geom->u1 = u_tan1;
     }
 
+    blendGeom3Print(geom);
+
     if (param->convex2) {
         PmCartesian blend_point;
         pmCirclePoint(&tc->coords.circle.xyz,
@@ -505,7 +507,6 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     tp_debug_print("vr1 = %f, vr2 = %f\n", prev_tc->reqvel, tc->reqvel);
     tp_debug_print("v_goal = %f, max scale = %f\n", param->v_goal, maxFeedScale);
-
 
     //Nominal length restriction prevents gobbling too much of parabolic blends
     param->L1 = phi1_max * prev_tc->coords.circle.xyz.radius;
@@ -805,13 +806,48 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     // Find the basis vector perpendicular to the binormal and uc
     PmCartesian nc;
     pmCartCartCross(&geom->binormal, &uc, &nc);
-    pmCartUnitEq(&nc);
+
+    //Check if nc is in the same half-plane as the intersection normal. if not,
+    //we need to flip it around to choose the correct solution.
+    double dot1;
+    pmCartCartDot(&geom->normal, &nc, &dot1);
+    if (dot1 < 0) {
+        pmCartNegEq(&nc);
+    }
+    int norm_err = pmCartUnitEq(&nc);
+    if (norm_err) {
+        return TP_ERR_FAIL;
+    }
 
     //Find components of center position wrt circle 1 center.
-    PmCartesian c_x,c_y, r_C1C;
-    pmCartScalMult(&uc,Cx,&c_x);
-    pmCartScalMult(&nc,Cy,&c_y);
+    PmCartesian c_x, c_y, r_C1C;
+    pmCartScalMult(&uc, Cx, &c_x);
+    pmCartScalMult(&nc, Cy, &c_y);
 
+    //Get vector from P to first center
+    PmCartesian r_PC1;
+    pmCartCartSub(&circ1->center, &geom->P, &r_PC1);
+    
+    // Get "test vectors, relative distance from solution center to P
+    PmCartesian test1, test2;
+    pmCartCartAdd(&r_PC1, &c_x, &test1);
+    test2=test1;
+
+    //Add and subtract c_y component to get equivalent of two Y solutions
+    pmCartCartAddEq(&test1, &c_y);
+    pmCartCartSubEq(&test2, &c_y);
+
+    double mag1,mag2;
+    pmCartMag(&test1, &mag1);
+    pmCartMag(&test2, &mag2);
+    
+    if (mag2 < mag1)
+    {
+        //negative solution is closer
+        pmCartNegEq(&c_y);
+    }
+
+    //Continue with correct solution, get actual center
     pmCartCartAdd(&c_x, &c_y, &r_C1C);
     pmCartCartAdd(&circ1->center, &r_C1C, &points->arc_center);
     tp_debug_print("arc center = %f %f %f\n",
@@ -823,9 +859,13 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     PmCartesian r_C2C;
     pmCartCartSub(&points->arc_center, &circ2->center, &r_C2C);
 
-    //Verify tolerances
+
+
+
     PmCartesian r_PC;
     pmCartCartSub(&points->arc_center, &geom->P, &r_PC);
+
+    //Verify tolerances
     double h;
     pmCartMag(&r_PC, &h);
     tp_debug_print("center_dist = %f\n", h);
@@ -903,4 +943,16 @@ int arcFromBlendPoints3(SphericalArc * const arc, BlendPoints3 const * const poi
             &points->arc_end, &points->arc_center);
 }
 
+int blendGeom3Print(BlendGeom3 const * const geom)
+{
+    tp_debug_print("u1 = %f %f %f\n",
+            geom->u1.x,
+            geom->u1.y,
+            geom->u1.z);
 
+    tp_debug_print("u2 = %f %f %f\n",
+            geom->u2.x,
+            geom->u2.y,
+            geom->u2.z);
+    return 0;
+}
