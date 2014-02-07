@@ -165,6 +165,7 @@ int arcConvexTest(PmCartesian const * const center,
     pmCartCartSub(P, center, &diff);
     pmCartCartDot(&diff, uVec, &dot);
 
+    tp_debug_print("convex test: dot = %f, reverse_dir = %d\n", dot, reverse_dir);
     int convex = (reverse_dir != 0) ^ (dot < 0);
     return convex;
 }
