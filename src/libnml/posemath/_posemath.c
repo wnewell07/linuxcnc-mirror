@@ -1909,13 +1909,13 @@ int pmCirclePoint(PmCircle const * const circle, double angle, PmCartesian * con
 
 int pmCircleStretch(PmCircle * const circ, double new_angle, int from_end)
 {
-
     double mag = 0;
     pmCartMagSq(&circ->rHelix, &mag);
     if ( mag > 1e-6 ) {
         //Can't handle helices or spirals
         return PM_ERR;
     }
+    //TODO handle spiral?
     if (from_end) {
         //Not implemented yet, way more reprocessing...
         PmCartesian new_start;
