@@ -1231,16 +1231,13 @@ STATIC int tpCheckCanonType(TC_STRUCT * const prev_tc, TC_STRUCT const * const t
     if (!tc || !prev_tc) {
         return TP_ERR_FAIL;
     }
-
     if ((prev_tc->canon_motion_type == EMC_MOTION_TYPE_TRAVERSE && tc->canon_motion_type != EMC_MOTION_TYPE_TRAVERSE) ||
             (prev_tc->canon_motion_type != EMC_MOTION_TYPE_TRAVERSE && tc->canon_motion_type == EMC_MOTION_TYPE_TRAVERSE)) {
         tp_debug_print("Can't blend between rapid and feed move\n");
         tcSetTermCond(prev_tc,TC_TERM_COND_STOP);
     }
     return TP_ERR_OK;
-
 }
-
 
 /**
  * Adds a rigid tap cycle to the motion queue.
@@ -2476,7 +2473,11 @@ STATIC int tpActivateSegment(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 
     // Test if we need ramping or trapezoidal acceleration for this move
     // FIXME: move this to INI setting
+<<<<<<< HEAD
     const double cutoff_freq = 10.0; //Hz
+=======
+    const double cutoff_freq = 20.0; //Hz
+>>>>>>> Added canon type fix
     double cutoff_time = 1.0 / (cutoff_freq);
 
     double length = (tc->target-tc->progress);
