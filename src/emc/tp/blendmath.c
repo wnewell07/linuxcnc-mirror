@@ -581,7 +581,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     // Check that we're not below the minimum intersection angle (making too tight an arc)
     // FIXME make this an INI setting?
-    const double theta_min = PM_PI / 6.0;
+    const double theta_min = PM_PI / 12.0;
     if (param->theta < theta_min) {
         tp_debug_print("theta = %f < min %f, aborting arc...\n",
                 param->theta,
@@ -1324,9 +1324,9 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     tp_debug_print("T_final = %f\n",T_final);
 
     //Find intersection points from
-    double scale1 = circ1->radius / d1;
+    double scale1 = R1_local / d1;
     pmCartScalMult(&r_C1C, scale1, &points->arc_start);
-    double scale2 = circ2->radius / d2;
+    double scale2 = R2_local / d2;
     pmCartScalMult(&r_C2C, scale2, &points->arc_end);
     pmCartCartAddEq(&points->arc_start, &circ1->center);
     pmCartCartAddEq(&points->arc_end, &circ2->center);
