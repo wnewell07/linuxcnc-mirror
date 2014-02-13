@@ -558,8 +558,6 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         geom->u1 = u_tan1;
     }
 
-    blendGeom3Print(geom);
-
     if (param->convex2) {
         PmCartesian blend_point;
         pmCirclePoint(&tc->coords.circle.xyz,
@@ -572,6 +570,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
     } else {
         geom->u2 = u_tan2;
     }
+    blendGeom3Print(geom);
 
     // Calculate angles between lines
     int res_angle = findIntersectionAngle(&geom->u1,
