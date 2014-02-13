@@ -48,20 +48,23 @@ int arcInitFromPoints(SphericalArc * const arc, PmCartesian const * const start,
     pmCartUnit(&arc->rStart, &u0);
     pmCartUnit(&arc->rEnd, &u1);
 
-#if 0
     //Correct center by 1/2 error method
     double err = mag1-mag0;
+    tp_debug_print("radius difference is %f\n", err);
     PmCartesian dStart,dEnd;
-    pmCartScalMult(&u0, err/2.0, &dStart);
-    pmCartScalMult(&u1, -err/2.0, &dEnd);
+    pmCartScalMult(&u0, -err/4.0, &dStart);
+    pmCartScalMult(&u1, err/4.0, &dEnd);
     pmCartCartAddEq(&arc->center,&dStart);
     pmCartCartAddEq(&arc->center,&dEnd);
     pmCartCartSub(&arc->start, &arc->center, &arc->rStart);
     pmCartCartSub(&arc->end, &arc->center, &arc->rEnd);
     pmCartMag(&arc->rStart, &mag0);
     pmCartMag(&arc->rEnd, &mag1);
-    tp_debug_print("New radii are %f and %f\n",mag0,mag1);
-#endif
+    tp_debug_print("New radii are %f and %f, difference is %g\n",mag0,mag1,mag1-mag0);
+    tp_debug_print("new center is = %f %f %f\n",
+            arc->center.x,
+            arc->center.y,
+            arc->center.z);
 
     //Assign radius and check for validity
     arc->radius = (mag0 + mag1)/2.0;

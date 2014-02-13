@@ -999,6 +999,7 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
             &tc->coords.circle.xyz.normal, TP_ANGLE_EPSILON);
     if (!colinear) {
         // Fail out if not collinear
+        tp_debug_print("arc abort: not coplanar\n");
         return TP_ERR_FAIL;
     }
 
