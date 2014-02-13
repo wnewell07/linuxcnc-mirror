@@ -2473,11 +2473,7 @@ STATIC int tpActivateSegment(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 
     // Test if we need ramping or trapezoidal acceleration for this move
     // FIXME: move this to INI setting
-<<<<<<< HEAD
-    const double cutoff_freq = 10.0; //Hz
-=======
     const double cutoff_freq = 20.0; //Hz
->>>>>>> Added canon type fix
     double cutoff_time = 1.0 / (cutoff_freq);
 
     double length = (tc->target-tc->progress);
