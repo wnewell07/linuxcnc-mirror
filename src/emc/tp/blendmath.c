@@ -908,6 +908,7 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     double t2 = param->L2 / s_arc2;
     double R2_local = circ2->radius + circ2->spiral * t2;
     double R_final = param->R_plan;
+    
     if (param->convex2) {
         R_final = fmin(R_final, circ2->radius / 2.0);
         R_final = fmin(R_final, R2_local / 2.0);
@@ -1009,8 +1010,11 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
 
     PmCartesian r_C2P;
     pmCartCartSub(&geom->P, &circ2->center, &r_C2P);
-    pmCartCartDot(&r_C2P, &r_C2C, &dot);
-    double dphi2=acos(saturate(dot / (circ2->radius * d2),1.0));
+    PmCartesian u_C2P, u_C2C;
+    pmCartUnit(&r_C2P, &u_C2P);
+    pmCartUnit(&r_C2C, &u_C2C);
+    pmCartCartDot(&u_C2P, &u_C2C, &dot);
+    double dphi2=acos(saturate(dot,1.0));
 
     tp_debug_print("dphi2 = %f\n", dphi2);
 
@@ -1147,8 +1151,13 @@ int blendArcLinePostProcess(BlendPoints3 * const points, BlendPoints3 const * co
 
     PmCartesian r_C1P;
     pmCartCartSub(&geom->P, &circ1->center, &r_C1P);
-    pmCartCartDot(&r_C1P, &r_C1C, &dot);
-    double dphi1=acos(saturate(dot / (circ1->radius * d1),1.0));
+    PmCartesian u_C1P, u_C1C;
+    pmCartUnit(&r_C1P, &u_C1P);
+    pmCartUnit(&r_C1C, &u_C1C);
+
+    pmCartCartDot(&u_C1P, &u_C1C, &dot);
+    tp_debug_print("dot = %f\n",dot);
+    double dphi1=acos(saturate(dot,1.0));
 
     tp_debug_print("dphi1 = %f\n", dphi1);
 
@@ -1204,7 +1213,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     double R_final = fmin(negate(d_guess1 - R1_local, param->convex1),
             negate(d_guess2 - R2_local, param->convex2));
 
-    if (param->convex1){
+    if (param->convex1){ 
         // Convex blends have weird side-effects, so don't increase radius
         R_final = fmin(R_final, circ1->radius / 2.0);
         R_final = fmin(R_final, R1_local / 2.0);
@@ -1335,13 +1344,19 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     pmCartCartSub(&geom->P, &circ1->center, &r_C1P);
 
     double dot;
-    pmCartCartDot(&r_C1P, &r_C1C, &dot);
-    double dphi1=acos(saturate(dot / (circ1->radius * d1),1.0));
+    PmCartesian u_C1P, u_C1C;
+    pmCartUnit(&r_C1P, &u_C1P);
+    pmCartUnit(&r_C1C, &u_C1C);
+    pmCartCartDot(&u_C1P, &u_C1C, &dot);
+    double dphi1=acos(saturate(dot,1.0));
 
     PmCartesian r_C2P;
     pmCartCartSub(&geom->P, &circ2->center, &r_C2P);
-    pmCartCartDot(&r_C2P, &r_C2C, &dot);
-    double dphi2=acos(saturate(dot / (circ2->radius * d2),1.0));
+    PmCartesian u_C2P, u_C2C;
+    pmCartUnit(&r_C2P, &u_C2P);
+    pmCartUnit(&r_C2C, &u_C2C);
+    pmCartCartDot(&u_C2P, &u_C2C, &dot);
+    double dphi2=acos(saturate(dot,1.0));
 
     tp_debug_print("dphi1 = %f, dphi2 = %f\n", dphi1, dphi2);
 
