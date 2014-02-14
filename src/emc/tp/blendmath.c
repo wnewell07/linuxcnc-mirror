@@ -515,13 +515,13 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
     }
 
     // Get tangent unit vectors to each arc at the intersection point
-    PmCartesian u_tan1, u_tan2;
-    tcGetEndTangentUnitVector(prev_tc, &u_tan1);
-    tcGetStartTangentUnitVector(tc, &u_tan2);
+
+    tcGetEndTangentUnitVector(prev_tc, &geom->u_tan1);
+    tcGetStartTangentUnitVector(tc, &geom->u_tan2);
 
     // Find angle between tangent lines
     double theta_tan;
-    findIntersectionAngle(&u_tan1, &u_tan2, &theta_tan);
+    findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
 
     // Get intersection point
     pmCirclePoint(&tc->coords.circle.xyz, 0.0, &geom->P);
@@ -530,8 +530,8 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
             geom->P.y,
             geom->P.z);
 
-    param->convex1 = arcConvexTest(&prev_tc->coords.circle.xyz.center, &geom->P, &u_tan2, false);
-    param->convex2 = arcConvexTest(&tc->coords.circle.xyz.center, &geom->P, &u_tan1, true);
+    param->convex1 = arcConvexTest(&prev_tc->coords.circle.xyz.center, &geom->P, &geom->u_tan2, false);
+    param->convex2 = arcConvexTest(&tc->coords.circle.xyz.center, &geom->P, &geom->u_tan1, true);
     tp_debug_print("circ1 convex: %d, circ2 convex: %d\n",
             param->convex1,
             param->convex2);
@@ -555,7 +555,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         pmCartCartSub(&geom->P, &blend_point, &geom->u1);
         pmCartUnitEq(&geom->u1);
     } else {
-        geom->u1 = u_tan1;
+        geom->u1 = geom->u_tan1;
     }
 
     if (param->convex2) {
@@ -568,7 +568,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         pmCartCartSub(&blend_point, &geom->P,  &geom->u2);
         pmCartUnitEq(&geom->u2);
     } else {
-        geom->u2 = u_tan2;
+        geom->u2 = geom->u_tan2;
     }
     blendGeom3Print(geom);
 
@@ -1189,6 +1189,12 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
             circ2->center.z);
     tp_debug_print("circ1 radius = %f\n", circ1->radius);
     tp_debug_print("circ2 radius = %f\n", circ2->radius);
+
+    //Create "shifted center" approximation of spiral circles
+    //FIXME recycle tangent vectors
+    PmCartesian center1;
+    
+
 
     //TODO need convex1 / convex2 here to flip signs on radius
     //Find the distance from the approximate center to each circle center
