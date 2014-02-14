@@ -937,6 +937,10 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     pmCartCartDot(&r_PC2, &geom->u1, &c2_u);
     pmCartCartDot(&r_PC2, &n1, &c2_n);
 
+    tp_debug_print("c2_u = %f, c2_n = %f\n",
+            c2_u,
+            c2_n);
+
     double d_L; // badly named distance along line to intersection
     double A = 1;
     double B = 2.0 * c2_u;
@@ -952,9 +956,10 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
 
     tp_debug_print("root0 = %f, root1 = %f\n",root0, 
             root1);
-    d_L = root0;
-    if (param->convex2) {
-        d_L *= -1;
+    d_L = fmin(fabs(root0),fabs(root1));
+    if (d_L < 0) {
+        tp_debug_print("d_L can't be < 0, aborting...\n");
+        return TP_ERR_FAIL;
     }
 
     PmCartesian C_u, C_n;
@@ -1084,10 +1089,11 @@ int blendArcLinePostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     double c1_u, c1_n; //Components of C1-P on u2 and n2
     pmCartCartDot(&r_PC1, &geom->u2, &c1_u);
     pmCartCartDot(&r_PC1, &n2, &c1_n);
+    c1_u *= -1.0; // Flip sign since u1 points away from line
 
     double d_L; // badly named distance along line to intersection
     double A = 1;
-    double B = -2.0 * c1_u;
+    double B = 2.0 * c1_u;
     if (param->convex1) {
         B *= -1;
     }
@@ -1100,9 +1106,10 @@ int blendArcLinePostProcess(BlendPoints3 * const points, BlendPoints3 const * co
 
     tp_debug_print("root0 = %f, root1 = %f\n",root0, 
             root1);
-    d_L = root0;
-    if (param->convex1) {
-        d_L *= -1;
+    d_L = fmin(fabs(root0),fabs(root1));
+    if (d_L < 0) {
+        tp_debug_print("d_L can't be < 0, aborting...\n");
+        return TP_ERR_FAIL;
     }
 
     PmCartesian C_u, C_n;
