@@ -898,10 +898,6 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
 
     //TODO need convex1 / convex2 here to flip signs on radius
     //Find the distance from the approximate center to each circle center
-    double d_guess2;
-    PmCartesian diff;
-    pmCartCartSub(&points_in->arc_center, &circ2->center, &diff);
-    pmCartMag(&diff, &d_guess2);
 
     //Guess at 
     double s_arc2 = circ2->radius * circ2->angle;
@@ -914,7 +910,6 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
         R_final = fmin(R_final, R2_local / 2.0);
     }
 
-    tp_debug_print("d_guess2 = %f\n", d_guess2);
     tp_debug_print("R_final = %f, R_guess = %f\n", R_final, param->R_plan);
 
     // Define distances from actual center to circle centers
