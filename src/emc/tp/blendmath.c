@@ -1184,58 +1184,61 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
             circ2->center.z);
     tp_debug_print("circ1 radius = %f\n", circ1->radius);
     tp_debug_print("circ2 radius = %f\n", circ2->radius);
+    tp_debug_print("circ1 spiral = %f\n", circ1->spiral);
+    tp_debug_print("circ2 spiral = %f\n", circ2->spiral);
 
     //Create "shifted center" approximation of spiral circles
-    //FIXME recycle tangent vectors
     PmCartesian center1;
-    
+    double dr1 = circ1->spiral / circ1->angle * PM_PI / 2.0;
+    pmCartScalMult(&geom->u_tan1, dr1, &center1);
+    pmCartCartAddEq(&center1, &circ1->center);
 
+    double radius1 = circ1->radius + circ1->spiral;
 
-    //TODO need convex1 / convex2 here to flip signs on radius
-    //Find the distance from the approximate center to each circle center
-    double d_guess1, d_guess2;
-    PmCartesian diff;
-    pmCartCartSub(&points_in->arc_center, &circ1->center, &diff);
-    pmCartMag(&diff, &d_guess1);
+    PmCartesian center2;
+    double dr2 = circ2->spiral / circ2->angle * PM_PI / 2.0;
+    pmCartScalMult(&geom->u_tan2, dr2, &center2);
+    pmCartCartAddEq(&center2, &circ2->center);
 
-    pmCartCartSub(&points_in->arc_center, &circ2->center, &diff);
-    pmCartMag(&diff, &d_guess2);
+    double radius2 = circ2->radius + circ2->spiral;
 
-    //Guess at 
-    double s_arc1 = circ1->radius * circ1->angle;
-    double s_arc2 = circ2->radius * circ2->angle;
+    tp_debug_print("center1 = %f %f %f\n",
+            center1.x,
+            center1.y,
+            center1.z);
 
-    double t1 = (1.0 - (s_arc1 - param->L1) / s_arc1);
-    double t2 = param->L2 / s_arc2;
-    double R1_local = circ1->radius + circ1->spiral * t1;
-    double R2_local = circ2->radius + circ2->spiral * t2;
+    tp_debug_print("center2 = %f %f %f\n",
+            center2.x,
+            center2.y,
+            center2.z);
+    tp_debug_print("radius1 = %f\n", radius1);
+    tp_debug_print("radius2 = %f\n", radius2);
 
-    // From the guessed center, find the minimum radius required to intersect the circles
-    double R_final = fmin(negate(d_guess1 - R1_local, param->convex1),
-            negate(d_guess2 - R2_local, param->convex2));
+    double R_final = param->R_plan;
 
+    //TODO make this larger?
+    const double convex_shrink = 0.75;
+    //TODO redundant checks? spiral is probably small enough that we can ignore it here
     if (param->convex1){ 
         // Convex blends have weird side-effects, so don't increase radius
-        R_final = fmin(R_final, circ1->radius / 2.0);
-        R_final = fmin(R_final, R1_local / 2.0);
+        R_final = fmin(R_final, circ1->radius * convex_shrink);
+        R_final = fmin(R_final, radius1 * convex_shrink);
     }
     if (param->convex2) {
-        R_final = fmin(R_final, circ2->radius / 2.0);
-        R_final = fmin(R_final, R2_local / 2.0);
+        R_final = fmin(R_final, circ2->radius * convex_shrink);
+        R_final = fmin(R_final, radius2 * convex_shrink);
     }
 
-    tp_debug_print("d_guess1 = %f, d_guess2 = %f\n", d_guess1, d_guess2);
     tp_debug_print("R_final = %f, R_guess = %f\n", R_final, param->R_plan);
 
-    // Define distances from actual center to circle centers
-    double d1 = negate(R_final, param->convex1) + R1_local;
-    double d2 = negate(R_final, param->convex2) + R2_local;
+    // Define distances from actual center to adjusted circle centers
+    double d1 = negate(R_final, param->convex1) + radius1;
+    double d2 = negate(R_final, param->convex2) + radius2;
     tp_debug_print("d1 = %f, d2 = %f\n", d1, d2);
-
 
     //Find "x" distance between C1 and C2
     PmCartesian r_C1C2;
-    pmCartCartSub(&circ2->center, &circ1->center, &r_C1C2);
+    pmCartCartSub(&center2, &center1, &r_C1C2);
     double c2x;
     pmCartMag(&r_C1C2, &c2x);
 
@@ -1274,7 +1277,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     //Get vector from P to first center
     PmCartesian r_PC1;
-    pmCartCartSub(&circ1->center, &geom->P, &r_PC1);
+    pmCartCartSub(&center1, &geom->P, &r_PC1);
     
     // Get "test vectors, relative distance from solution center to P
     PmCartesian test1, test2;
@@ -1297,7 +1300,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     //Continue with correct solution, get actual center
     pmCartCartAdd(&c_x, &c_y, &r_C1C);
-    pmCartCartAdd(&circ1->center, &r_C1C, &points->arc_center);
+    pmCartCartAdd(&center1, &r_C1C, &points->arc_center);
     tp_debug_print("arc center = %f %f %f\n",
             points->arc_center.x,
             points->arc_center.y,
@@ -1305,7 +1308,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     //Find components of center position wrt circle 2 center.
     PmCartesian r_C2C;
-    pmCartCartSub(&points->arc_center, &circ2->center, &r_C2C);
+    pmCartCartSub(&points->arc_center, &center2, &r_C2C);
 
     PmCartesian r_PC;
     pmCartCartSub(&points->arc_center, &geom->P, &r_PC);
@@ -1325,12 +1328,12 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     tp_debug_print("T_final = %f\n",T_final);
 
     //Find intersection points from
-    double scale1 = R1_local / d1;
+    double scale1 = radius1 / d1;
     pmCartScalMult(&r_C1C, scale1, &points->arc_start);
-    double scale2 = R2_local / d2;
+    double scale2 = radius2 / d2;
     pmCartScalMult(&r_C2C, scale2, &points->arc_end);
-    pmCartCartAddEq(&points->arc_start, &circ1->center);
-    pmCartCartAddEq(&points->arc_end, &circ2->center);
+    pmCartCartAddEq(&points->arc_start, &center1);
+    pmCartCartAddEq(&points->arc_end, &center2);
 
     tp_debug_print("arc start = %f %f %f\n",
             points->arc_start.x,
@@ -1342,7 +1345,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
             points->arc_end.z);
 
     PmCartesian r_C1P;
-    pmCartCartSub(&geom->P, &circ1->center, &r_C1P);
+    pmCartCartSub(&geom->P, &center1, &r_C1P);
 
     double dot;
     PmCartesian u_C1P, u_C1C;
@@ -1352,7 +1355,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     double dphi1=acos(saturate(dot,1.0));
 
     PmCartesian r_C2P;
-    pmCartCartSub(&geom->P, &circ2->center, &r_C2P);
+    pmCartCartSub(&geom->P, &center2, &r_C2P);
     PmCartesian u_C2P, u_C2C;
     pmCartUnit(&r_C2P, &u_C2P);
     pmCartUnit(&r_C2C, &u_C2C);
