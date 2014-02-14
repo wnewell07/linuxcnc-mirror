@@ -894,14 +894,11 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
             circ2->center.z);
     tp_debug_print("circ2 radius = %f\n", circ2->radius);
 
-
     //TODO need convex1 / convex2 here to flip signs on radius
     //Find the distance from the approximate center to each circle center
 
     // Find local circular approximation of spiral
-    double s_arc2 = circ2->radius * circ2->angle;
-    double t2 = param->L2 / s_arc2;
-    double radius2 = circ2->radius + circ2->spiral * t2;
+    double radius2 = circ2->radius;
     double R_final = param->R_plan;
 
     PmCartesian center2;
@@ -1052,9 +1049,7 @@ int blendArcLinePostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     pmCartScalMult(&geom->u1, dr1, &center1);
     pmCartCartAddEq(&center1, &circ1->center);
 
-    double s_arc1 = circ1->radius * circ1->angle;
-    double t1 = 1.0 - points_in->trim1 / s_arc1;
-    double radius1 = circ1->radius + circ1->spiral * t1;
+    double radius1 = circ1->radius + circ1->spiral;
 
     double R_final = param->R_plan;
 #if 0
@@ -1202,19 +1197,14 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     double dr1 = circ1->spiral / circ1->angle * PM_PI / 2.0;
     pmCartScalMult(&geom->u1, dr1, &center1);
     pmCartCartAddEq(&center1, &circ1->center);
-
-    double s_arc1 = circ1->radius * circ1->angle;
-    double t1 = 1.0 - points_in->trim1 / s_arc1;
-    double radius1 = circ1->radius + circ1->spiral * t1;
+    double radius1 = circ1->radius + circ1->spiral;
 
     PmCartesian center2;
     double dr2 = circ2->spiral / circ2->angle * PM_PI / 2.0;
     pmCartScalMult(&geom->u2, dr2, &center2);
     pmCartCartAddEq(&center2, &circ2->center);
 
-    double s_arc2 = circ2->radius * circ2->angle;
-    double t2 = points_in->trim2 / s_arc2;
-    double radius2 = circ2->radius + circ2->spiral * t2;
+    double radius2 = circ2->radius;
 
     tp_debug_print("center1 = %f %f %f\n",
             center1.x,
@@ -1382,7 +1372,7 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     //Update param structure with new values
     param->R_plan = R_final;
-    param->v_plan = pmSqrt(param->R_plan * param->a_n_max);
+    param->v_plan = fmin(pmSqrt(param->R_plan * param->a_n_max), param->v_plan);
     param->v_actual = fmin(param->v_plan, param->v_actual);
 
     return TP_ERR_OK;

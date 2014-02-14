@@ -60,8 +60,8 @@ int arcInitFromPoints(SphericalArc * const arc, PmCartesian const * const start,
             arc->center.y,
             arc->center.z);
 
-    //Assign radius and check for validity
-    arc->radius = fmin(mag0,mag1);
+    // estimate radius of spiral shape by average of two lengths
+    arc->radius = (mag0 + mag1) / 2.0;
 
     if (mag0 < ARC_MIN_RADIUS) {
         tp_debug_print("radius %f below min radius %f, aborting arc\n",

@@ -752,6 +752,30 @@ STATIC int tpFinalizeSegmentLength(TP_STRUCT const * const tp, TC_STRUCT * const
     return TP_ERR_OK;
 }
 
+STATIC int tpDebugTangentInfo(TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT const * const blend_tc, BlendGeom3 const * const geom)
+{
+    // Debug Information to diagnose tangent issues
+    PmCartesian u_circ1_end,u_arc_start,u_arc_end,u_circ2_start;
+
+    tcGetEndTangentUnitVector(prev_tc, &u_circ1_end);
+    tcGetStartTangentUnitVector(tc, &u_circ2_start);
+
+    pmCartCartCross(&geom->binormal, &blend_tc->coords.arc.xyz.rStart, &u_arc_start);
+    pmCartUnitEq(&u_arc_start);
+
+    pmCartCartCross(&geom->binormal, &blend_tc->coords.arc.xyz.rEnd, &u_arc_end);
+    pmCartUnitEq(&u_arc_end);
+
+    double dot;
+    pmCartCartDot(&u_circ1_end, &u_arc_start, &dot);
+    double theta1 = acos(dot);
+    pmCartCartDot(&u_circ2_start, &u_arc_end, &dot);
+    double theta2 = acos(dot);
+
+    tp_debug_print("theta1 = %f, theta2 = %f\n",theta1,theta2);
+    return TP_ERR_OK;
+}
+
 STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, TC_STRUCT * const tc, TC_STRUCT * const blend_tc)
 {
     tp_debug_print("Starting LineArc blend arc\n");
@@ -780,6 +804,9 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &acc_bound,
             &vel_bound,
             emcmotConfig->maxFeedScale);
+
+    param.a_max *= TP_ARC_ACCEL_REDUCTION;
+    param.a_n_max *= TP_ARC_ACCEL_REDUCTION;
     int res_param = blendComputeParameters(&param);
     blendCheckConsume(&param, prev_tc, emcmotConfig->arcBlendGapCycles);
 
@@ -875,6 +902,8 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
+
+    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
     return TP_ERR_OK;
 }
 
@@ -909,6 +938,9 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
             &acc_bound,
             &vel_bound,
             emcmotConfig->maxFeedScale);
+
+    param.a_max *= TP_ARC_ACCEL_REDUCTION;
+    param.a_n_max *= TP_ARC_ACCEL_REDUCTION;
     int res_param = blendComputeParameters(&param);
     blendCheckConsume(&param, prev_tc, emcmotConfig->arcBlendGapCycles);
 
@@ -987,6 +1019,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
+    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
     return TP_ERR_OK;
 }
 
@@ -1021,6 +1054,8 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
             &acc_bound,
             &vel_bound,
             emcmotConfig->maxFeedScale);
+    param.a_max *= TP_ARC_ACCEL_REDUCTION;
+    param.a_n_max *= TP_ARC_ACCEL_REDUCTION;
 
     int res_param = blendComputeParameters(&param);
     int res_points = blendFindPoints3(&points_approx, &geom, &param);
@@ -1117,6 +1152,9 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
+
+    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
+
     return TP_ERR_OK;
 }
 
