@@ -297,6 +297,8 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
         // Direction is away from P (at start of segment)
         pmCartCartSub(&blend_point, &geom->P,  &geom->u2);
         pmCartUnitEq(&geom->u2);
+        //Reduce theta proportionally to the angle between the secant and the normal
+        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 2.0);
     } else {
         geom->u2 = geom->u_tan2;
     }
@@ -405,6 +407,9 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
         // Direction is toward P (at end of segment)
         pmCartCartSub(&geom->P, &blend_point, &geom->u1);
         pmCartUnitEq(&geom->u1);
+
+        //Reduce theta proportionally to the angle between the secant and the normal
+        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 2.0);
     } else {
         geom->u1 = geom->u_tan1;
     }
@@ -504,7 +509,10 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     // Find angle between tangent lines
     double theta_tan;
-    findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    int res_angle = findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    if (res_angle) {
+        return TP_ERR_FAIL;
+    }
 
     // Get intersection point
     pmCirclePoint(&tc->coords.circle.xyz, 0.0, &geom->P);
@@ -527,6 +535,8 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
     param->phi1_max = fmin(prev_tc->coords.circle.xyz.angle * 2.0 / 3.0, blend_angle_1);
     param->phi2_max = fmin(tc->coords.circle.xyz.angle / 3.0, blend_angle_2);
 
+    param->theta = theta_tan;
+
     // Build the correct unit vector for the linear approximation
     if (param->convex1) {
         param->phi1_max /= 2.0;
@@ -538,6 +548,10 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         // Direction is toward P (at end of segment)
         pmCartCartSub(&geom->P, &blend_point, &geom->u1);
         pmCartUnitEq(&geom->u1);
+
+        //Reduce theta proportionally to the angle between the secant and the normal
+        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 2.0);
+
     } else {
         geom->u1 = geom->u_tan1;
     }
@@ -552,17 +566,14 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         // Direction is away from P (at start of segment)
         pmCartCartSub(&blend_point, &geom->P,  &geom->u2);
         pmCartUnitEq(&geom->u2);
+
+        //Reduce theta proportionally to the angle between the secant and the normal
+        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 2.0);
     } else {
         geom->u2 = geom->u_tan2;
     }
     blendGeom3Print(geom);
 
-    // Calculate angles between lines
-    int res_angle = findIntersectionAngle(&geom->u1,
-            &geom->u2, &param->theta);
-    if (res_angle) {
-        return TP_ERR_FAIL;
-    }
 
     // Check that we're not below the minimum intersection angle (making too tight an arc)
     // FIXME make this an INI setting?
@@ -645,6 +656,8 @@ int blendInit3FromLines(BlendGeom3 * const geom, BlendParameters * const param,
     //Copy over unit vectors and intersection point
     geom->u1 = prev_tc->coords.line.xyz.uVec;
     geom->u2 = tc->coords.line.xyz.uVec;
+    geom->u_tan1 = prev_tc->coords.line.xyz.uVec;
+    geom->u_tan2 = tc->coords.line.xyz.uVec;
     geom->P = prev_tc->coords.line.xyz.end;
 
     //Calculate angles between lines
@@ -703,8 +716,8 @@ int blendInit3FromLines(BlendGeom3 * const geom, BlendParameters * const param,
 int blendCalculateNormals3(BlendGeom3 * const geom)
 {
 
-    int err_cross = pmCartCartCross(&geom->u1,
-            &geom->u2,
+    int err_cross = pmCartCartCross(&geom->u_tan1,
+            &geom->u_tan2,
             &geom->binormal);
     int err_unit_b = pmCartUnitEq(&geom->binormal);
 
@@ -712,7 +725,7 @@ int blendCalculateNormals3(BlendGeom3 * const geom)
             geom->binormal.y,
             geom->binormal.z);
 
-    pmCartCartSub(&geom->u2, &geom->u1, &geom->normal);
+    pmCartCartSub(&geom->u_tan2, &geom->u_tan1, &geom->normal);
     int err_unit_n = pmCartUnitEq(&geom->normal);
 
     tp_debug_print("normal = [%f %f %f]\n", geom->normal.x,
