@@ -1044,33 +1044,20 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     double phi2_new = tc->coords.circle.xyz.angle - points_exact.trim2;
 
     // TODO pare down this debug output
-    tp_debug_print("phi2_new = %f\n",phi2_new);
-    tp_debug_print("circ2 angle = %f\n",
-            tc->coords.circle.xyz.angle);
-    tp_debug_print("prev spiral = %f\n",
-            prev_tc->coords.circle.xyz.spiral);
-    tp_debug_print("next spiral = %f\n",
-            tc->coords.circle.xyz.spiral);
-    tp_debug_print("normal = %f %f %f\n",
-            tc->coords.circle.xyz.normal.x,
-            tc->coords.circle.xyz.normal.y,
-            tc->coords.circle.xyz.normal.z);
-    tp_debug_print("rHelix = %f %f %f\n",
-            tc->coords.circle.xyz.rHelix.x,
-            tc->coords.circle.xyz.rHelix.y,
-            tc->coords.circle.xyz.rHelix.z);
+    tp_debug_print("phi1_new = %f, trim1 = %f\n", phi1_new, points_exact.trim1);
+    tp_debug_print("phi2_new = %f, trim2 = %f\n", phi2_new, points_exact.trim2);
 
     if (points_exact.trim1 > param.phi1_max) {
         tp_debug_print("trim1 %f > phi1_max %f, aborting arc...\n",
-                phi1_new,
-                points_exact.trim1);
+                points_exact.trim1,
+                param.phi1_max);
         return TP_ERR_FAIL;
     }
 
     if (points_exact.trim2 > param.phi2_max) {
         tp_debug_print("trim2 %f > phi2_max %f, aborting arc...\n",
-                phi2_new,
-                points_exact.trim2);
+                points_exact.trim2,
+                param.phi2_max);
         return TP_ERR_FAIL;
     }
 

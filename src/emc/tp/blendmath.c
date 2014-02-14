@@ -538,14 +538,15 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     //Identify max angle for first arc by blend limits
     // TODO better name?
-    double blend_angle_1 = param->convex1 ? theta_tan/2.0 : PM_PI / 2.0;
-    double blend_angle_2 = param->convex2 ? theta_tan/2.0 : PM_PI / 2.0;
+    double blend_angle_1 = param->convex1 ? theta_tan : PM_PI / 2.0;
+    double blend_angle_2 = param->convex2 ? theta_tan : PM_PI / 2.0;
 
     param->phi1_max = fmin(prev_tc->coords.circle.xyz.angle * 2.0 / 3.0, blend_angle_1);
     param->phi2_max = fmin(tc->coords.circle.xyz.angle / 3.0, blend_angle_2);
 
     // Build the correct unit vector for the linear approximation
     if (param->convex1) {
+        param->phi1_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&prev_tc->coords.circle.xyz,
                 prev_tc->coords.circle.xyz.angle - param->phi1_max,
@@ -559,6 +560,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
     }
 
     if (param->convex2) {
+        param->phi2_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&tc->coords.circle.xyz,
                 param->phi2_max,
@@ -1186,6 +1188,8 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
     tp_debug_print("circ2 radius = %f\n", circ2->radius);
     tp_debug_print("circ1 spiral = %f\n", circ1->spiral);
     tp_debug_print("circ2 spiral = %f\n", circ2->spiral);
+    tp_debug_print("circ1 angle = %f\n", circ1->angle);
+    tp_debug_print("circ2 angle = %f\n", circ2->angle);
 
     //Create "shifted center" approximation of spiral circles
     PmCartesian center1;
@@ -1216,18 +1220,17 @@ int blendArcArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * con
 
     double R_final = param->R_plan;
 
+#if 0
     //TODO make this larger?
-    const double convex_shrink = 0.75;
-    //TODO redundant checks? spiral is probably small enough that we can ignore it here
+    const double convex_shrink = 0.999;
     if (param->convex1){ 
         // Convex blends have weird side-effects, so don't increase radius
-        R_final = fmin(R_final, circ1->radius * convex_shrink);
         R_final = fmin(R_final, radius1 * convex_shrink);
     }
     if (param->convex2) {
-        R_final = fmin(R_final, circ2->radius * convex_shrink);
         R_final = fmin(R_final, radius2 * convex_shrink);
     }
+#endif
 
     tp_debug_print("R_final = %f, R_guess = %f\n", R_final, param->R_plan);
 
