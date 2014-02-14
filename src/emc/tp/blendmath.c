@@ -288,21 +288,21 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
     param->phi2_max = fmin(tc->coords.circle.xyz.angle / 3.0, blend_angle_2);
 
     if (param->convex2) {
-        param->phi2_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&tc->coords.circle.xyz,
-                param->phi2_max,
+                param->phi2_max / 2.0,
                 &blend_point);
         //Create new unit vector based on secant line
         // Direction is away from P (at start of segment)
         pmCartCartSub(&blend_point, &geom->P,  &geom->u2);
         pmCartUnitEq(&geom->u2);
         //Reduce theta proportionally to the angle between the secant and the normal
-        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 2.0);
+        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 4.0);
     } else {
         geom->u2 = geom->u_tan2;
     }
 
+    tp_debug_print("phi2_max = %f\n", param->phi2_max);
     blendGeom3Print(geom);
 
     // Calculate angles between lines
@@ -354,7 +354,7 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
 
     if (param->convex2) {
         //use half of the length of the chord
-        param->L2 = sin(param->phi2_max/2.0) * tc->coords.circle.xyz.radius;
+        param->L2 = sin(param->phi2_max/4.0) * tc->coords.circle.xyz.radius;
     }
     tp_debug_print("L1 = %f, L2 = %f\n", param->L1, param->L2);
 
@@ -398,10 +398,9 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
 
     // Build the correct unit vector for the linear approximation
     if (param->convex1) {
-        param->phi1_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&prev_tc->coords.circle.xyz,
-                prev_tc->coords.circle.xyz.angle - param->phi1_max,
+                prev_tc->coords.circle.xyz.angle - param->phi1_max / 2.0 ,
                 &blend_point);
         //Create new unit vector based on secant line
         // Direction is toward P (at end of segment)
@@ -409,13 +408,14 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
         pmCartUnitEq(&geom->u1);
 
         //Reduce theta proportionally to the angle between the secant and the normal
-        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 2.0);
+        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 4.0);
     } else {
         geom->u1 = geom->u_tan1;
     }
     geom->u2 = geom->u_tan2;
 
     blendGeom3Print(geom);
+    tp_debug_print("phi1_max = %f\n", param->phi1_max);
 
     // Calculate angles between lines
     int res_angle = findIntersectionAngle(&geom->u1,
@@ -466,7 +466,7 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
 
     if (param->convex1) {
         //use half of the length of the chord
-        param->L1 = sin(param->phi1_max/2.0) * prev_tc->coords.circle.xyz.radius;
+        param->L1 = sin(param->phi1_max/4.0) * prev_tc->coords.circle.xyz.radius;
     }
     tp_debug_print("L1 = %f, L2 = %f\n", param->L1, param->L2);
 
@@ -539,10 +539,9 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     // Build the correct unit vector for the linear approximation
     if (param->convex1) {
-        param->phi1_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&prev_tc->coords.circle.xyz,
-                prev_tc->coords.circle.xyz.angle - param->phi1_max,
+                prev_tc->coords.circle.xyz.angle - param->phi1_max / 2.0,
                 &blend_point);
         //Create new unit vector based on secant line
         // Direction is toward P (at end of segment)
@@ -550,17 +549,16 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         pmCartUnitEq(&geom->u1);
 
         //Reduce theta proportionally to the angle between the secant and the normal
-        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 2.0);
+        param->theta = fmin(param->theta, theta_tan - param->phi1_max / 4.0);
 
     } else {
         geom->u1 = geom->u_tan1;
     }
 
     if (param->convex2) {
-        param->phi2_max /= 2.0;
         PmCartesian blend_point;
         pmCirclePoint(&tc->coords.circle.xyz,
-                param->phi2_max,
+                param->phi2_max / 2.0,
                 &blend_point);
         //Create new unit vector based on secant line
         // Direction is away from P (at start of segment)
@@ -568,7 +566,7 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
         pmCartUnitEq(&geom->u2);
 
         //Reduce theta proportionally to the angle between the secant and the normal
-        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 2.0);
+        param->theta = fmin(param->theta, theta_tan - param->phi2_max / 4.0);
     } else {
         geom->u2 = geom->u_tan2;
     }
@@ -617,13 +615,15 @@ int blendInit3FromArcs(BlendGeom3 * const geom, BlendParameters * const param,
 
     if (param->convex1) {
         //use half of the length of the chord
-        param->L1 = sin(param->phi1_max/2.0) * prev_tc->coords.circle.xyz.radius;
+        param->L1 = sin(param->phi1_max/4.0) * prev_tc->coords.circle.xyz.radius;
     }
     if (param->convex2) {
         //use half of the length of the chord
-        param->L2 = sin(param->phi2_max/2.0) * tc->coords.circle.xyz.radius;
+        param->L2 = sin(param->phi2_max/4.0) * tc->coords.circle.xyz.radius;
     }
     tp_debug_print("L1 = %f, L2 = %f\n", param->L1, param->L2);
+    tp_debug_print("phi1_max = %f\n",param->phi1_max);
+    tp_debug_print("phi2_max = %f\n",param->phi2_max);
 
     double nominal_tolerance;
     tcFindBlendTolerance(prev_tc, tc, &param->tolerance, &nominal_tolerance);
@@ -944,9 +944,6 @@ int blendLineArcPostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     double d_L; // badly named distance along line to intersection
     double A = 1;
     double B = 2.0 * c2_u;
-    if (param->convex2) {
-        B *= -1;
-    }
     double C = pmSq(c2_u) - pmSq(d2) + pmSq(R_final - c2_n);
     double root0,root1;
     int res_dist = quadraticFormula(A, B, C, &root0, &root1);
@@ -1089,14 +1086,10 @@ int blendArcLinePostProcess(BlendPoints3 * const points, BlendPoints3 const * co
     double c1_u, c1_n; //Components of C1-P on u2 and n2
     pmCartCartDot(&r_PC1, &geom->u2, &c1_u);
     pmCartCartDot(&r_PC1, &n2, &c1_n);
-    c1_u *= -1.0; // Flip sign since u1 points away from line
 
     double d_L; // badly named distance along line to intersection
     double A = 1;
     double B = 2.0 * c1_u;
-    if (param->convex1) {
-        B *= -1;
-    }
     double C = pmSq(c1_u) - pmSq(d1) + pmSq(R_final - c1_n);
     double root0,root1;
     int res_dist = quadraticFormula(A, B, C, &root0, &root1);
