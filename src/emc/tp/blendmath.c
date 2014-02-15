@@ -127,7 +127,7 @@ bool pmCircLineCoplanar(PmCircle const * const circ,
 {
     double dot;
     pmCartCartDot(&circ->normal, &line->uVec, &dot);
-    if (dot < tol) {
+    if (fabs(dot) < tol) {
         return true;
     } else {
         return false;
