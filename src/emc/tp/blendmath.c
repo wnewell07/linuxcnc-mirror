@@ -264,7 +264,11 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
 
     // Find angle between tangent lines
     double theta_tan;
-    findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    int res_angle = findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    if (res_angle) {
+        return TP_ERR_FAIL;
+    }
+
 
     // Get intersection point from line
     geom->P = prev_tc->coords.line.xyz.end;
@@ -286,6 +290,7 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
     double blend_angle_2 = param->convex2 ? theta_tan : PM_PI / 2.0;
 
     param->phi2_max = fmin(tc->coords.circle.xyz.angle / 3.0, blend_angle_2);
+    param->theta = theta_tan;
 
     if (param->convex2) {
         PmCartesian blend_point;
@@ -305,12 +310,6 @@ int blendInit3FromLineArc(BlendGeom3 * const geom, BlendParameters * const param
     tp_debug_print("phi2_max = %f\n", param->phi2_max);
     blendGeom3Print(geom);
 
-    // Calculate angles between lines
-    int res_angle = findIntersectionAngle(&geom->u1,
-            &geom->u2, &param->theta);
-    if (res_angle) {
-        return TP_ERR_FAIL;
-    }
 
     // Check that we're not below the minimum intersection angle (making too tight an arc)
     // FIXME make this an INI setting?
@@ -376,7 +375,10 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
 
     // Find angle between tangent lines
     double theta_tan;
-    findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    int res_angle = findIntersectionAngle(&geom->u_tan1, &geom->u_tan2, &theta_tan);
+    if (res_angle) {
+        return TP_ERR_FAIL;
+    }
 
     // Get intersection point from line
     geom->P = tc->coords.line.xyz.start;
@@ -395,6 +397,7 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
     double blend_angle_1 = param->convex1 ? theta_tan : PM_PI / 2.0;
 
     param->phi1_max = fmin(prev_tc->coords.circle.xyz.angle * 2.0 / 3.0, blend_angle_1);
+    param->theta = theta_tan;
 
     // Build the correct unit vector for the linear approximation
     if (param->convex1) {
@@ -416,13 +419,6 @@ int blendInit3FromArcLine(BlendGeom3 * const geom, BlendParameters * const param
 
     blendGeom3Print(geom);
     tp_debug_print("phi1_max = %f\n", param->phi1_max);
-
-    // Calculate angles between lines
-    int res_angle = findIntersectionAngle(&geom->u1,
-            &geom->u2, &param->theta);
-    if (res_angle) {
-        return TP_ERR_FAIL;
-    }
 
     // Check that we're not below the minimum intersection angle (making too tight an arc)
     // FIXME make this an INI setting?
