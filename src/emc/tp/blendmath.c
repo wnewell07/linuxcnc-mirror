@@ -657,9 +657,9 @@ int blendInit3FromLines(BlendGeom3 * const geom, BlendParameters * const param,
     geom->P = prev_tc->coords.line.xyz.end;
 
     //Calculate angles between lines
-    int res = findIntersectionAngle(&geom->u1,
+    int res_angle = findIntersectionAngle(&geom->u1,
             &geom->u2, &param->theta);
-    if (res) {
+    if (res_angle) {
         return TP_ERR_FAIL;
     }
     tp_debug_print("theta = %f\n", param->theta);
