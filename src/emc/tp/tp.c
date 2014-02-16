@@ -793,28 +793,37 @@ STATIC int tpFinalizeSegmentLength(TP_STRUCT const * const tp, TC_STRUCT * const
     return TP_ERR_OK;
 }
 
-STATIC int tpDebugTangentInfo(TC_STRUCT const * const prev_tc, TC_STRUCT const * const tc, TC_STRUCT const * const blend_tc, BlendGeom3 const * const geom)
+STATIC int tpCheckBlendTangent(PmCircle const * const circ1, PmCircle const * const circ2, SphericalArc const * const arc, BlendGeom3 const * const geom)
 {
     // Debug Information to diagnose tangent issues
     PmCartesian u_circ1_end,u_arc_start,u_arc_end,u_circ2_start;
 
-    tcGetEndTangentUnitVector(prev_tc, &u_circ1_end);
-    tcGetStartTangentUnitVector(tc, &u_circ2_start);
+    pmCircleTangentVector(circ1, 0.0, &u_circ1_end);
+    pmCircleTangentVector(circ2, circ2->angle, &u_circ2_start);
 
-    pmCartCartCross(&geom->binormal, &blend_tc->coords.arc.xyz.rStart, &u_arc_start);
+    pmCartCartCross(&geom->binormal, &arc->rStart, &u_arc_start);
     pmCartUnitEq(&u_arc_start);
 
-    pmCartCartCross(&geom->binormal, &blend_tc->coords.arc.xyz.rEnd, &u_arc_end);
+    pmCartCartCross(&geom->binormal, &arc->rEnd, &u_arc_end);
     pmCartUnitEq(&u_arc_end);
 
     //TODO fail if theta is too large
     double dot;
     pmCartCartDot(&u_circ1_end, &u_arc_start, &dot);
-    double theta1 = acos(dot);
     pmCartCartDot(&u_circ2_start, &u_arc_end, &dot);
+    double theta1 = acos(dot);
     double theta2 = acos(dot);
 
     tp_debug_print("theta1 = %f, theta2 = %f\n",theta1,theta2);
+
+    if (theta1 > TP_MIN_ARC_ANGLE) {
+        tp_debug_print("theta1 too large\n");
+        return TP_ERR_FAIL;
+    }
+    if (theta2 > TP_MIN_ARC_ANGLE) {
+        tp_debug_print("theta2 too large\n");
+        return TP_ERR_FAIL;
+    }
     return TP_ERR_OK;
 }
 
@@ -945,7 +954,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
 
-    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
+    /*tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);*/
     return TP_ERR_OK;
 }
 
@@ -1061,7 +1070,29 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
-    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
+    /*tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);*/
+    return TP_ERR_OK;
+}
+
+
+/**
+ * Given a PmCircle and a circular segment, copy the circle in as the XYZ portion of the segment, then update the motion parameters.
+ * NOTE: does not yet support ABC or UVW motion!
+ */
+STATIC int tcSetCircleXYZ(TC_STRUCT * const tc, PmCircle const * const circ)
+{
+
+    //Update targets with new arc length
+    if (!circ || tc->motion_type != TC_CIRCULAR) {
+        return TP_ERR_FAIL;
+    }
+    if (!tc->coords.circle.abc.tmag_zero || !tc->coords.circle.uvw.tmag_zero) {
+        rtapi_print_msg(RTAPI_MSG_ERR, "SetCircleXYZ does not supportABC or UVW motion\n");
+        return TP_ERR_FAIL;
+    }
+
+    tc->coords.circle.xyz = *circ;
+    tc->target = circ->angle * circ->radius;
     return TP_ERR_OK;
 }
 
@@ -1114,7 +1145,7 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     }
     
     /* If blend calculations were successful, then we're ready to create the
-     * blend arc.
+     * blend arc. Begin work on temp copies of each circle here:
      */
 
     double phi1_new = prev_tc->coords.circle.xyz.angle - points_exact.trim1;
@@ -1138,12 +1169,11 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
         return TP_ERR_FAIL;
     }
 
-    // Change lengths of circles
-    // FIXME partial failure after this point leaves us in an unrecoverable
-    // state. We might need to do a copy and swap to
-    // ensure that we can quit at any time without borking the existing
-    // geometry.
-    int res_stretch1 = pmCircleStretch(&prev_tc->coords.circle.xyz,
+    //Store working copies of geometry
+    PmCircle circ1_temp = prev_tc->coords.circle.xyz;
+    PmCircle circ2_temp = tc->coords.circle.xyz;
+
+    int res_stretch1 = pmCircleStretch(&circ1_temp,
             phi1_new,
             false);
     //TODO create blends
@@ -1151,7 +1181,7 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
         return TP_ERR_FAIL;
     }
 
-    int res_stretch2 = pmCircleStretch(&tc->coords.circle.xyz,
+    int res_stretch2 = pmCircleStretch(&circ2_temp,
             phi2_new,
             true);
     //TODO create blends
@@ -1159,29 +1189,21 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
         return TP_ERR_FAIL;
     }
 
-    //Update targets with new arc length
-    prev_tc->target = prev_tc->coords.circle.xyz.angle *
-        prev_tc->coords.circle.xyz.radius;
-    tc->target = tc->coords.circle.xyz.angle *
-        tc->coords.circle.xyz.radius;
-
-    //Cleanup any mess from parabolic
-    tc->blend_prev = 0;
-    tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
-
-    blendPoints3Print(&points_exact);
     //Get exact start and end points to account for spiral in arcs
-    pmCirclePoint(&prev_tc->coords.circle.xyz,
-            prev_tc->coords.circle.xyz.angle,
+    pmCirclePoint(&circ1_temp,
+            circ1_temp.angle,
             &points_exact.arc_start);
-    pmCirclePoint(&tc->coords.circle.xyz,
+    pmCirclePoint(&circ2_temp,
             0.0,
             &points_exact.arc_end);
     //TODO deal with large spiral values, or else detect and fall back?
 
     tp_debug_print("Modified arc points\n");
     blendPoints3Print(&points_exact);
-    arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
+    int res_arc = arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
+    if (res_arc != TP_ERR_OK) {
+        return TP_ERR_FAIL;
+    }
 
     // Note that previous restrictions don't allow ABC or UVW movement, so the
     // end and start points should be identical
@@ -1195,7 +1217,19 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
 
-    tpDebugTangentInfo(prev_tc, tc,blend_tc,&geom);
+    int res_tangent = tpCheckBlendTangent(&circ1_temp, &circ2_temp, &blend_tc->coords.arc.xyz, &geom);
+    if (res_tangent) {
+        return TP_ERR_FAIL;
+    }
+
+    tp_debug_print("Passed all tests, updating segments\n");
+
+    tcSetCircleXYZ(prev_tc, &circ1_temp);
+    tcSetCircleXYZ(tc, &circ2_temp);
+
+    //Cleanup any mess from parabolic
+    tc->blend_prev = 0;
+    tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
 
     return TP_ERR_OK;
 }
