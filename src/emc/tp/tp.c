@@ -677,28 +677,6 @@ STATIC double tpCalculateTriangleVel(TP_STRUCT const * const tp, TC_STRUCT * con
 
 
 /**
- * Find the maximum angle allowed between "tangent" segments.
- * @param v speed of motion in worst case (i.e. at max feed).
- * @param acc magnitude of acceleration allowed during "kink".
- *
- * Since we are discretized by a timestep, the maximum allowable
- * "kink" in a trajectory is bounded by normal acceleration. A small
- * kink will effectively be one step along the tightest radius arc
- * possible at a given speed.
- */
-STATIC inline double tpMaxTangentAngle(TP_STRUCT const * const tp, double v, double acc) {
-    double dx = v / tp->cycleTime;
-    if (dx > 0.0) {
-        return (acc / dx);
-    } else {
-        tp_debug_print(" Velocity or period is negative!\n");
-        //Should not happen...
-        return TP_ANGLE_EPSILON;
-    }
-}
-
-
-/**
  * Calculate the angle between two unit cartesian vectors.
  */
 STATIC inline int tpCalculateUnitCartAngle(PmCartesian const * const u1, PmCartesian const * const u2, double * const theta) {
@@ -713,55 +691,6 @@ STATIC inline int tpCalculateUnitCartAngle(PmCartesian const * const u1, PmCarte
     *theta = acos(dot);
     return TP_ERR_OK;
 }
-
-STATIC int tpCheckBlendStartTangent(PmCircle const * const circ, SphericalArc const * const arc, BlendGeom3 const * const geom)
-{
-    // Debug Information to diagnose tangent issues
-    PmCartesian u_circ_end, u_arc_start;
-
-    pmCircleTangentVector(circ, 0.0, &u_circ_end);
-
-    pmCartCartCross(&geom->binormal, &arc->rStart, &u_arc_start);
-    pmCartUnitEq(&u_arc_start);
-
-    //TODO fail if theta is too large
-    double dot;
-    pmCartCartDot(&u_circ_end, &u_arc_start, &dot);
-    double theta = acos(dot);
-
-    tp_debug_print("blend start angle = %f\n",theta);
-
-    if (theta > TP_MIN_ARC_ANGLE) {
-        tp_debug_print("angle too large\n");
-        return TP_ERR_FAIL;
-    }
-    return TP_ERR_OK;
-}
-
-STATIC int tpCheckBlendEndTangent(PmCircle const * const circ, SphericalArc const * const arc, BlendGeom3 const * const geom)
-{
-    // Debug Information to diagnose tangent issues
-    PmCartesian u_arc_end,u_circ_start;
-
-    pmCircleTangentVector(circ, circ->angle, &u_circ_start);
-
-    pmCartCartCross(&geom->binormal, &arc->rEnd, &u_arc_end);
-    pmCartUnitEq(&u_arc_end);
-
-    //TODO fail if theta is too large
-    double dot;
-    pmCartCartDot(&u_circ_start, &u_arc_end, &dot);
-    double theta = acos(dot);
-
-    tp_debug_print("theta = %f\n",theta);
-
-    if (theta > TP_MIN_ARC_ANGLE) {
-        tp_debug_print("angle too large\n");
-        return TP_ERR_FAIL;
-    }
-    return TP_ERR_OK;
-}
-
 
 /**
  * Initialize a blend arc from its parent lines.
@@ -984,7 +913,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 
     blendPoints3Print(&points_exact);
     //Get exact start and end points to account for spiral in arcs
-    pmCirclePoint(&tc->coords.circle.xyz,
+    pmCirclePoint(&circ2_temp,
             0.0,
             &points_exact.arc_end);
     //TODO deal with large spiral values, or else detect and fall back?
@@ -992,7 +921,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tp_debug_print("Modified arc points\n");
     blendPoints3Print(&points_exact);
     int res_arc = arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
-    if (res_arc) {
+    if (res_arc < 0) {
         return TP_ERR_FAIL;
     }
 
@@ -1005,7 +934,7 @@ STATIC int tpCreateLineArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
 
-    int res_tangent = tpCheckBlendEndTangent(&circ2_temp, &blend_tc->coords.arc.xyz, &geom);
+    int res_tangent = checkTangentAngle(&circ2_temp, &blend_tc->coords.arc.xyz, &geom, &param, tp->cycleTime, true);
     if (res_tangent) {
         tp_debug_print("failed tangent check, aborting arc...\n");
         return TP_ERR_FAIL;
@@ -1077,15 +1006,6 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
      * blend arc.
      */
 
-    double phi1_new = prev_tc->coords.circle.xyz.angle - points_exact.trim1;
-
-    if (points_exact.trim1 > param.phi1_max) {
-        tp_debug_print("trim1 %f > phi1_max %f, aborting arc...\n",
-                points_exact.trim1,
-                param.phi1_max);
-        return TP_ERR_FAIL;
-    }
-
     //Store working copies of geometry
     PmCircle circ1_temp = prev_tc->coords.circle.xyz;
     PmCartLine line2_temp = tc->coords.line.xyz;
@@ -1100,7 +1020,16 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
         return TP_ERR_FAIL;
     }
 
-    int res_stretch1 = pmCircleStretch(&circ2_temp,
+    double phi1_new = circ1_temp.angle - points_exact.trim1;
+
+    if (points_exact.trim1 > param.phi1_max) {
+        tp_debug_print("trim1 %f > phi1_max %f, aborting arc...\n",
+                points_exact.trim1,
+                param.phi1_max);
+        return TP_ERR_FAIL;
+    }
+
+    int res_stretch1 = pmCircleStretch(&circ1_temp,
             phi1_new,
             false);
     //TODO create blends
@@ -1112,13 +1041,15 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tp_debug_print("modified arc points\n");
     // Copy actual arc end point to blend arc start
     pmCirclePoint(&circ1_temp,
-            circ1_temp->angle,
-            &points_exact.arc_end);
+            circ1_temp.angle,
+            &points_exact.arc_start);
 
     blendPoints3Print(&points_exact);
 
-    // Set up blend arc based on found points
-    arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
+    int res_arc = arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
+    if (res_arc < 0) {
+        return TP_ERR_FAIL;
+    }
 
     // Note that previous restrictions don't allow ABC or UVW movement, so the
     // end and start points should be identical
@@ -1132,7 +1063,7 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
 
-    int res_tangent = tpCheckBlendStartTangent(&circ1_temp, &blend_tc->coords.arc.xyz, &geom);
+    int res_tangent = checkTangentAngle(&circ1_temp, &blend_tc->coords.arc.xyz, &geom, &param, tp->cycleTime, false);
     if (res_tangent) {
         tp_debug_print("failed tangent check, aborting arc...\n");
         return TP_ERR_FAIL;
@@ -1140,12 +1071,8 @@ STATIC int tpCreateArcLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc,
 
     tp_debug_print("Passed all tests, updating segments\n");
 
-    //Cleanup any mess from parabolic
-    tc->blend_prev = 0;
-    tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
-
-    tcSetCircleXYZ(tc, &circ1_temp);
-    tcSetLineXYZ(prev_tc, &line2_temp);
+    tcSetCircleXYZ(prev_tc, &circ1_temp);
+    tcSetLineXYZ(tc, &line2_temp);
 
     //Cleanup any mess from parabolic
     tc->blend_prev = 0;
@@ -1258,7 +1185,7 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     tp_debug_print("Modified arc points\n");
     blendPoints3Print(&points_exact);
     int res_arc = arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points_exact, &geom, &param);
-    if (res_arc != TP_ERR_OK) {
+    if (res_arc < 0) {
         return TP_ERR_FAIL;
     }
 
@@ -1274,8 +1201,8 @@ STATIC int tpCreateArcArcBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc, 
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
             param.v_plan, param.a_max);
 
-    int res_tangent1 = tpCheckBlendStartTangent(&circ1_temp, &blend_tc->coords.arc.xyz, &geom);
-    int res_tangent2 = tpCheckBlendEndTangent(&circ2_temp, &blend_tc->coords.arc.xyz, &geom);
+    int res_tangent1 = checkTangentAngle(&circ1_temp, &blend_tc->coords.arc.xyz, &geom, &param, tp->cycleTime, false);
+    int res_tangent2 = checkTangentAngle(&circ2_temp, &blend_tc->coords.arc.xyz, &geom, &param, tp->cycleTime, true);
     if (res_tangent1 || res_tangent2) {
         tp_debug_print("failed tangent check, aborting arc...\n");
         return TP_ERR_FAIL;
@@ -1328,14 +1255,17 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
     if (res_blend != TP_ERR_OK) {
         return res_blend;
     }
+
     // Set up actual blend arc here
-    arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points, &geom, &param);
+    int res_arc = arcFromBlendPoints3(&blend_tc->coords.arc.xyz, &points, &geom, &param);
+    if (res_arc < 0) {
+        return TP_ERR_FAIL;
+    }
 
     // Note that previous restrictions don't allow ABC or UVW movement, so the
     // end and start points should be identical
     blend_tc->coords.arc.abc = prev_tc->coords.line.abc.end;
     blend_tc->coords.arc.uvw = prev_tc->coords.line.uvw.end;
-
 
     //set the max velocity to v_plan, since we'll violate constraints otherwise.
     tpInitBlendArcFromPrev(tp, prev_tc, blend_tc, param.v_actual,
@@ -1687,19 +1617,14 @@ STATIC int tpSetupTangent(TP_STRUCT const * const tp,
     //TODO move this to setup
     tpGetMachineAccelLimit(&acc_limit);
 
-    // FIXME hard-coded max "normal" acceleration for a tangent intersection
-    const double TP_ACC_RATIO_TANGENT_NORMAL = TP_ACC_RATIO_NORMAL * 0.2;
-    double acc_margin = TP_ACC_RATIO_TANGENT_NORMAL * acc_limit;
-    tp_debug_print("acc_margin = %f\n", acc_margin);
-    double max_angle = tpMaxTangentAngle(tp, v_reachable, acc_margin);
-    double a_n_actual = 2.0 * sin(phi/2.0) * v_reachable / tp->cycleTime;
-    double a_t_ratio = 1.0 - a_n_actual / acc_limit;
-    tp_debug_print("a_t_ratio = %f\n", a_t_ratio);
+    double max_angle = findMaxTangentAngle(v_reachable, acc_limit, tp->cycleTime);
 
     if (phi <= max_angle) {
         tp_debug_print(" New segment tangent with angle %g\n", phi);
         tcSetTermCond(prev_tc, TC_TERM_COND_TANGENT);
         //Calculate actual normal acceleration during tangent transition
+        double a_t_ratio = 1.0 - findKinkAccel(phi, v_reachable, tp->cycleTime) / acc_limit;
+        tp_debug_print("a_t_ratio = %f\n", a_t_ratio);
 
         prev_tc->maxaccel *= a_t_ratio;
         tc->maxaccel *= a_t_ratio;
