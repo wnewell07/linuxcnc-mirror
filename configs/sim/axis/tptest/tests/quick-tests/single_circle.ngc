@@ -1,0 +1,7 @@
+(info: single_circle.ngc converted to subroutine)
+o<single_circle> sub
+G20 G61 G90
+G0 X0 Y0 Z0
+G2 X0 Y0 I1 J1 F9999
+;not for subroutine: M30
+o<single_circle> endsub

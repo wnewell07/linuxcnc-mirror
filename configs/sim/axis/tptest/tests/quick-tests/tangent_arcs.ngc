@@ -1,0 +1,10 @@
+(info: tangent_arcs.ngc converted to subroutine)
+o<tangent_arcs> sub
+(Test case for detecting tangent arcs and lines)
+G20 G90 G64 G17
+G0 X0 Y0 Z0
+G1 X1 F9999
+G2 J-1
+G1 Y1
+;not for subroutine: M2
+o<tangent_arcs> endsub

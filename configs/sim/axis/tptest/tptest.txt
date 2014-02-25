@@ -1,0 +1,44 @@
+tptest.ini: config for testing trajectory planner
+
+py_tptest.ini python version
+
+
+Notes:
+
+git remote add github-robE https://github.com/robEllenberg/linuxcnc-mirror.git
+git fetch github-robE
+git checkout -b 3d-blend-arc-techdemo github-robE/circular-blend-arc-beta
+
+./autogen.sh
+./configure --enable-simulator
+. ./scripts/rip-environment
+
+apt-get install cscope
+
+[TRAJ]NO_FORCE_HOMING = 1
+
+[TRAJ]ARC_BLEND_ENABLE = 1
+[TRAJ]ARC_BLEND_FALLBACK_ENABLE = 1
+[TRAJ]ARC_BLEND_OPTIMIZATION_DEPTH = 50
+[TRAJ]ARC_BLEND_SMOOTHING_THRESHOLD = 0.4
+
+
+vmax: 500 ipm    500/60 = 8.333333 inch/s
+accel: 30 in/s/s
+
+
+http://electronicsam.com/images/KandT/testing/circblend_pyvcp/
+sim.tbl same
+simulated_home.hal old not using names=
+
+
+cherry-pick
+00e7e13 iniaxis.cc: fix uninitialized vars
+dc00d06 ini: add hal pin for ini max_acceleration
+e5858b2 hal: make pins for several ini file items
+
+decrease fonts size in xml to better fit with ngcgui tabs
+there is a but in pyngcgui that doesn't scroll tabs
+fixed with: d138397 pyngcgui: allow tabs scroll for any mode
+
+chips.ngc --removed tool use so times are not affected
