@@ -538,7 +538,7 @@ static void process_inputs(void)
 	    *emcmot_hal_data->paused_at_motion_type = tpGetMotionType(emcmotQueue);
 
 	    // record current carte pos for return move
-	    emcmotStatus->pause_carte_pos = tpGetPos(emcmotQueue);
+	    tpGetPos(emcmotQueue, &emcmotStatus->pause_carte_pos);
 
 	    // clone parameters from primary queue
 	    tpSnapshot(emcmotPrimQueue, emcmotAltQueue);
@@ -548,7 +548,7 @@ static void process_inputs(void)
 	    tpClear(emcmotAltQueue);
 
 	    // start alternate queue where we left off the primary queue
-	    tpSetPos(emcmotAltQueue,  emcmotStatus->pause_carte_pos);
+	    tpSetPos(emcmotAltQueue,  &emcmotStatus->pause_carte_pos);
 
 	    // switch to alternate motion queue
 	    emcmotQueue = emcmotAltQueue;
@@ -620,7 +620,8 @@ static void process_inputs(void)
 	update_offset_pose();
 	*emcmot_hal_data->pause_offset_in_range = inRange(emcmotStatus->pause_offset_carte_pos, 0, NULL);
 
-	EmcPose cpos = tpGetPos(emcmotQueue);
+	EmcPose cpos;
+	tpGetPos(emcmotQueue, &cpos);
 
 	if (*emcmot_hal_data->pause_offset_enable &&
 	    *emcmot_hal_data->pause_offset_in_range &&
@@ -657,7 +658,8 @@ static void process_inputs(void)
 	if (tpIsDone(emcmotQueue)) { // jog motion stopped
 	    rtapi_print_msg(RTAPI_MSG_DBG, "stopped after jog\n");
 
-	    EmcPose cpos = tpGetPos(emcmotQueue);
+	    EmcPose cpos;
+	    tpGetPos(emcmotQueue, &cpos);
 	    if (EQUAL_EMC_POSE(emcmotStatus->pause_carte_pos,cpos)) {
 		// at initial pause position.
 		*emcmot_hal_data->pause_state = PS_PAUSED;
@@ -669,7 +671,8 @@ static void process_inputs(void)
 	    if (!*emcmot_hal_data->pause_offset_enable) {
 		// stop a move in progress
 		tpClear(emcmotQueue);
-		EmcPose here  = tpGetPos(emcmotQueue);
+		EmcPose here;
+		tpGetPos(emcmotQueue, &here);
 		if (EQUAL_EMC_POSE(emcmotStatus->pause_offset_carte_pos, here)) {
 		    rtapi_print_msg(RTAPI_MSG_DBG, "move stopped, in initial pause position\n");
 		    *emcmot_hal_data->pause_state = PS_PAUSED;
@@ -1028,7 +1031,7 @@ static void set_operating_mode(void)
 
     /* check for emcmotDebug->enabling */
     if (emcmotDebug->enabling && !GET_MOTION_ENABLE_FLAG()) {
-	tpSetPos(emcmotQueue, emcmotStatus->carte_pos_cmd);
+	tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
 	for (joint_num = 0; joint_num < num_joints; joint_num++) {
 	    /* point to joint data */
 	    joint = &joints[joint_num];
@@ -1053,7 +1056,8 @@ static void set_operating_mode(void)
 	if (GET_MOTION_INPOS_FLAG()) {
 
 	    /* update coordinated emcmotDebug->queue position */
-	    tpSetPos(emcmotQueue, emcmotStatus->carte_pos_cmd);
+	    tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
+
 	    /* drain the cubics so they'll synch up */
 	    for (joint_num = 0; joint_num < num_joints; joint_num++) {
 		/* point to joint data */
@@ -1063,8 +1067,8 @@ static void set_operating_mode(void)
 	    /* Initialize things to do when starting teleop mode. */
 	    ZERO_EMC_POSE(emcmotDebug->teleop_data.currentVel);
 	    ZERO_EMC_POSE(emcmotDebug->teleop_data.desiredVel);
-	    ZERO_EMC_POSE(emcmotDebug->teleop_data.currentAccell);
-	    ZERO_EMC_POSE(emcmotDebug->teleop_data.desiredAccell);
+	    ZERO_EMC_POSE(emcmotDebug->teleop_data.currentAccel);
+	    ZERO_EMC_POSE(emcmotDebug->teleop_data.desiredAccel);
 	    SET_MOTION_TELEOP_FLAG(1);
 	    SET_MOTION_ERROR_FLAG(0);
 	} else {
@@ -1091,7 +1095,8 @@ static void set_operating_mode(void)
 	if (emcmotDebug->coordinating && !GET_MOTION_COORD_FLAG()) {
 	    if (GET_MOTION_INPOS_FLAG()) {
 		/* preset traj planner to current position */
-		tpSetPos(emcmotQueue, emcmotStatus->carte_pos_cmd);
+		tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
+
 		/* drain the cubics so they'll synch up */
 		for (joint_num = 0; joint_num < num_joints; joint_num++) {
 		    /* point to joint data */
@@ -1450,8 +1455,10 @@ static void get_pos_cmds(long period)
 	    /* they're empty, pull next point(s) off Cartesian planner */
 	    /* run coordinated trajectory planning cycle */
 	    tpRunCycle(emcmotQueue, period);
+
 	    /* gt new commanded traj pos */
-	    emcmotStatus->carte_pos_cmd = tpGetPos(emcmotQueue);
+	    tpGetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
+
 	    /* OUTPUT KINEMATICS - convert to joints in local array */
 	    kinematicsInverse(&emcmotStatus->carte_pos_cmd, positions,
 		&iflags, &fflags);
@@ -1486,86 +1493,86 @@ static void get_pos_cmds(long period)
 	break;
     case EMCMOT_MOTION_TELEOP:
 
-	/* first the desired Accell's are computed based on
+	/* first the desired Accel's are computed based on
 	    desired Velocity, current velocity and period */
-	emcmotDebug->teleop_data.desiredAccell.tran.x =
+	emcmotDebug->teleop_data.desiredAccel.tran.x =
 	    (emcmotDebug->teleop_data.desiredVel.tran.x -
 	    emcmotDebug->teleop_data.currentVel.tran.x) /
 	    servo_period;
-	emcmotDebug->teleop_data.desiredAccell.tran.y =
+	emcmotDebug->teleop_data.desiredAccel.tran.y =
 	    (emcmotDebug->teleop_data.desiredVel.tran.y -
 	    emcmotDebug->teleop_data.currentVel.tran.y) /
 	    servo_period;
-	emcmotDebug->teleop_data.desiredAccell.tran.z =
+	emcmotDebug->teleop_data.desiredAccel.tran.z =
 	    (emcmotDebug->teleop_data.desiredVel.tran.z -
 	    emcmotDebug->teleop_data.currentVel.tran.z) /
 	    servo_period;
 
-	/* a Carthesian Accell is computed */
-	pmCartMag(emcmotDebug->teleop_data.desiredAccell.tran,
+	/* a Carthesian Accel is computed */
+	pmCartMag(&emcmotDebug->teleop_data.desiredAccel.tran,
 	    &accell_mag);
 
 	/* then the accells for the rotary axes */
-	emcmotDebug->teleop_data.desiredAccell.a =
+	emcmotDebug->teleop_data.desiredAccel.a =
 	    (emcmotDebug->teleop_data.desiredVel.a -
 	    emcmotDebug->teleop_data.currentVel.a) /
 	    servo_period;
-	emcmotDebug->teleop_data.desiredAccell.b =
+	emcmotDebug->teleop_data.desiredAccel.b =
 	    (emcmotDebug->teleop_data.desiredVel.b -
 	    emcmotDebug->teleop_data.currentVel.b) /
 	    servo_period;
-	emcmotDebug->teleop_data.desiredAccell.c =
+	emcmotDebug->teleop_data.desiredAccel.c =
 	    (emcmotDebug->teleop_data.desiredVel.c -
 	    emcmotDebug->teleop_data.currentVel.c) /
 	    servo_period;
-	if (fabs(emcmotDebug->teleop_data.desiredAccell.a) > accell_mag) {
-	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccell.a);
+	if (fabs(emcmotDebug->teleop_data.desiredAccel.a) > accell_mag) {
+	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccel.a);
 	}
-	if (fabs(emcmotDebug->teleop_data.desiredAccell.b) > accell_mag) {
-	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccell.b);
+	if (fabs(emcmotDebug->teleop_data.desiredAccel.b) > accell_mag) {
+	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccel.b);
 	}
-	if (fabs(emcmotDebug->teleop_data.desiredAccell.c) > accell_mag) {
-	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccell.c);
+	if (fabs(emcmotDebug->teleop_data.desiredAccel.c) > accell_mag) {
+	    accell_mag = fabs(emcmotDebug->teleop_data.desiredAccel.c);
 	}
 	
 	/* accell_mag should now hold the max accell */
 	
 	if (accell_mag > emcmotStatus->acc) {
 	    /* if accell_mag is too great, all need resizing */
-	    pmCartScalMult(emcmotDebug->teleop_data.desiredAccell.tran, 
+	    pmCartScalMult(&emcmotDebug->teleop_data.desiredAccel.tran, 
 		emcmotStatus->acc / accell_mag,
-		&emcmotDebug->teleop_data.currentAccell.tran);
-	    emcmotDebug->teleop_data.currentAccell.a =
-		emcmotDebug->teleop_data.desiredAccell.a *
+		&emcmotDebug->teleop_data.currentAccel.tran);
+	    emcmotDebug->teleop_data.currentAccel.a =
+		emcmotDebug->teleop_data.desiredAccel.a *
 		emcmotStatus->acc / accell_mag;
-	    emcmotDebug->teleop_data.currentAccell.b =
-		emcmotDebug->teleop_data.desiredAccell.b *
+	    emcmotDebug->teleop_data.currentAccel.b =
+		emcmotDebug->teleop_data.desiredAccel.b *
 		emcmotStatus->acc / accell_mag;
-	    emcmotDebug->teleop_data.currentAccell.c =
-		emcmotDebug->teleop_data.desiredAccell.c *
+	    emcmotDebug->teleop_data.currentAccel.c =
+		emcmotDebug->teleop_data.desiredAccel.c *
 		emcmotStatus->acc / accell_mag;
 	    emcmotDebug->teleop_data.currentVel.tran.x +=
-		emcmotDebug->teleop_data.currentAccell.tran.x *
+		emcmotDebug->teleop_data.currentAccel.tran.x *
 		servo_period;
 	    emcmotDebug->teleop_data.currentVel.tran.y +=
-		emcmotDebug->teleop_data.currentAccell.tran.y *
+		emcmotDebug->teleop_data.currentAccel.tran.y *
 		servo_period;
 	    emcmotDebug->teleop_data.currentVel.tran.z +=
-		emcmotDebug->teleop_data.currentAccell.tran.z *
+		emcmotDebug->teleop_data.currentAccel.tran.z *
 		servo_period;
 	    emcmotDebug->teleop_data.currentVel.a +=
-		emcmotDebug->teleop_data.currentAccell.a *
+		emcmotDebug->teleop_data.currentAccel.a *
 		servo_period;
 	    emcmotDebug->teleop_data.currentVel.b +=
-		emcmotDebug->teleop_data.currentAccell.b *
+		emcmotDebug->teleop_data.currentAccel.b *
 		servo_period;
 	    emcmotDebug->teleop_data.currentVel.c +=
-		emcmotDebug->teleop_data.currentAccell.c *
+		emcmotDebug->teleop_data.currentAccel.c *
 		servo_period;
 	} else {
 	    /* if accell_mag is not greater, the computed accell's stay as is */
-	    emcmotDebug->teleop_data.currentAccell =
-		emcmotDebug->teleop_data.desiredAccell;
+	    emcmotDebug->teleop_data.currentAccel =
+		emcmotDebug->teleop_data.desiredAccel;
 	    emcmotDebug->teleop_data.currentVel =
 		emcmotDebug->teleop_data.desiredVel;
 	}

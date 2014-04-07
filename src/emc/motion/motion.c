@@ -907,7 +907,7 @@ static int init_comm_buffers(void)
 
     emcmotDebug = &emcmotStruct->debug;
 
-    emcmotPrimQueue = &emcmotStruct->debug.queue;     // primary motion queue
+    emcmotPrimQueue = &emcmotStruct->debug.tp;     // primary motion queue
     emcmotAltQueue = &emcmotStruct->debug.altqueue;   // alternate motion queue
 
     // emcmotQueue: this was formerly &emcmotDebug->queue
@@ -1084,16 +1084,17 @@ static int init_comm_buffers(void)
     emcmotDebug->start_time = etime();
     emcmotDebug->running_time = 0.0;
 
-    emcmotPrimQueue = &emcmotStruct->debug.queue;     // primary motion queue
+    emcmotPrimQueue = &emcmotStruct->debug.tp;     // primary motion queue
     emcmotAltQueue = &emcmotStruct->debug.altqueue;   // alternate motion queue
 
     /* init motion emcmotDebug->queue */
     if (-1 == tpCreate(emcmotPrimQueue, DEFAULT_TC_QUEUE_SIZE,
-	    emcmotDebug->queueTcSpace)) {
+		       emcmotDebug->queueTcSpace)) {
 	rtapi_print_msg(RTAPI_MSG_ERR,
 	    "MOTION: failed to create motion emcmotPrimQueue\n");
 	return -1;
     }
+
     // and the alternate queue
     if (-1 == tpCreate(emcmotAltQueue, DEFAULT_ALT_TC_QUEUE_SIZE,
 	    emcmotDebug->altqueueTcSpace)) {
@@ -1105,7 +1106,7 @@ static int init_comm_buffers(void)
 
 //    tpInit(&emcmotDebug->queue); // tpInit called from tpCreate
     tpSetCycleTime(emcmotQueue, emcmotConfig->trajCycleTime);
-    tpSetPos(emcmotQueue, emcmotStatus->carte_pos_cmd);
+    tpSetPos(emcmotQueue, &emcmotStatus->carte_pos_cmd);
     tpSetVmax(emcmotQueue, emcmotStatus->vel, emcmotStatus->vel);
     tpSetAmax(emcmotQueue, emcmotStatus->acc);
 

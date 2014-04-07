@@ -71,6 +71,7 @@ to another.
 // eventually this should be separated out into emcmotinternal or so
 // #define STRUCTS_IN_SHMEM
 
+#define STRUCTS_IN_SHMEM
 
 
 #ifndef MOTION_H
@@ -102,9 +103,9 @@ extern "C" {
 
     typedef struct _EMC_TELEOP_DATA {
 	EmcPose currentVel;
-	EmcPose currentAccell;
+	EmcPose currentAccel;
 	EmcPose desiredVel;
-	EmcPose desiredAccell;
+	EmcPose desiredAccel;
     } EMC_TELEOP_DATA;
 
 /* This enum lists all the possible commands */
@@ -181,6 +182,8 @@ extern "C" {
 	EMCMOT_SET_MOTOR_OFFSET,	/* set the offset between joint and motor */
 	EMCMOT_SET_JOINT_COMP,	/* set a compensation triplet for a joint (nominal, forw., rev.) */
         EMCMOT_SET_OFFSET, /* set tool offsets */
+        EMCMOT_SET_MAX_FEED_OVERRIDE,
+        EMCMOT_SETUP_ARC_BLENDS,
     } cmd_code_t;
 
 /* this enum lists the possible results of a command */
@@ -196,6 +199,7 @@ extern "C" {
 /* termination conditions for queued motions */
 #define EMCMOT_TERM_COND_STOP 1
 #define EMCMOT_TERM_COND_BLEND 2
+#define EMCMOT_TERM_COND_TANGENT 3
 
 /*********************************
        COMMAND STRUCTURE
@@ -252,6 +256,12 @@ extern "C" {
 	char    direction;      /* CANON_DIRECTION flag for spindle orient */
 	double  timeout;        /* of wait for spindle orient to complete */
 	unsigned char tail;	/* flag count for mutex detect */
+        int arcBlendOptDepth;
+        int arcBlendEnable;
+        int arcBlendFallbackEnable;
+        double arcBlendGapCycles;
+        double arcBlendRampFreq;
+        double maxFeedScale;
     } emcmot_command_t;
 
 /*! \todo FIXME - these packed bits might be replaced with chars
@@ -751,6 +761,12 @@ Suggestion: Split this in to an Error and a Status flag register..
 	KINEMATICS_TYPE kinematics_type;
 	int debug;		/* copy of DEBUG, from .ini file */
 	unsigned char tail;	/* flag count for mutex detect */
+        int arcBlendOptDepth;
+        int arcBlendEnable;
+        int arcBlendFallbackEnable;
+        double arcBlendGapCycles;
+        double arcBlendRampFreq;
+        double maxFeedScale;
     } emcmot_config_t;
 
 /*********************************
