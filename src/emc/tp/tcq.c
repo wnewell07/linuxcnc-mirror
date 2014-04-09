@@ -1,21 +1,16 @@
-/*!
- ********************************************************************
+/********************************************************************
  * Description: tcq.c
- *\brief queue handling functions for trajectory planner
- * These following functions implement the motion queue that
- * is fed by tpAddLine/tpAddCircle and consumed by tpRunCycle.
- * They have been fully working for a long time and a wise programmer
- * won't mess with them.
+ *   Queue handling functions for motion and the trajectory planner.
  *
- *\author Derived from a work by Fred Proctor & Will Shackleford
- *\author rewritten by Chris Radek
+ *   Derived from a work by Fred Proctor & Will Shackleford
  *
+ * Author:
  * License: GPL Version 2
  * System: Linux
- *
- * Copyright (c) 2004 All rights reserved.
- *
+ *    
+ * Copyright (c) 2014 All rights reserved.
  ********************************************************************/
+
 
 #include "tcq.h"
 #include <stddef.h>

@@ -1,17 +1,19 @@
 /********************************************************************
-* Description: tc.h
-*   Discriminate-based trajectory planning
-*
-*   Derived from a work by Fred Proctor & Will Shackleford
-*
-* Author:
-* License: GPL Version 2
-* System: Linux
-*    
-* Copyright (c) 2004 All rights reserved.
-*
-* Last change:
-********************************************************************/
+ * Description: tc_types.h
+ *
+ *   Trajectory component/segment (TC) common types and enums. This header was
+ *   separated from tc.h due to resolve circular dependencies with other
+ *   headers.
+ *
+ *   Derived from a work by Fred Proctor & Will Shackleford
+ *
+ * Author: Robert W. Ellenberg
+ * License: GPL Version 2
+ * System: Linux
+ *    
+ * Copyright (c) 2014 All rights reserved.
+ ********************************************************************/
+
 #ifndef TC_TYPES_H
 #define TC_TYPES_H
 

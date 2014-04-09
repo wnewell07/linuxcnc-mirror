@@ -1,15 +1,13 @@
 /********************************************************************
-* Description: blendmath.c
-*   Circular arc blend math functions
-*
-* Author: Robert W. Ellenberg
-* License: GPL Version 2
-* System: Linux
-*   
-* Copyright (c) 2014 All rights reserved.
-*
-* Last change:
-********************************************************************/
+ * Description: blendmath.c
+ *   Circular arc blending geometry and trajectory math functions.
+ *
+ * Author: Robert W. Ellenberg
+ * License: GPL Version 2
+ * System: Linux
+ *   
+ * Copyright (c) 2014 All rights reserved.
+ ********************************************************************/
 
 #include "posemath.h"
 #include "tc_types.h"

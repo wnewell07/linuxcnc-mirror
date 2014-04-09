@@ -1,19 +1,24 @@
 /********************************************************************
-* Description: tc_debug.h
-*
-*
-* Author: Robert W. Ellenberg
-* License: GPL Version 2
-* System: Linux
-*    
-* Copyright (c) 2013 All rights reserved.
-*
-* Last change:
-********************************************************************/
+ * Description: tc_debug.h
+ *
+ *   Miscellaneous debug statements and flags for the trajectory planner.
+ *
+ * Author: Robert W. Ellenberg
+ * License: GPL Version 2
+ * System: Linux
+ *    
+ * Copyright (c) 2013 All rights reserved.
+ ********************************************************************/
+
 #ifndef TP_DEBUG_H
 #define TP_DEBUG_H
 
 #include "rtapi.h"  /* printing functions */
+
+/* NOTE: these names have mutated somewhat and aren't always used consistently in the
+ * TP. At some point this should be overhauled with more standard names,
+ * perhaps that can be used elsewhere in motion instead of just the TP.
+ */
 
 /** TP debug stuff */
 #ifdef TP_DEBUG

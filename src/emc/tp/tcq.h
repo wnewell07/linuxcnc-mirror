@@ -1,10 +1,6 @@
 /********************************************************************
  * Description: tcq.c
- *\brief queue handling functions for trajectory planner
- * These following functions implement the motion queue that
- * is fed by tpAddLine/tpAddCircle and consumed by tpRunCycle.
- * They have been fully working for a long time and a wise programmer
- * won't mess with them.
+ *   Queue handling functions for motion and the trajectory planner.
  *
  *   Derived from a work by Fred Proctor & Will Shackleford
  *
@@ -12,9 +8,7 @@
  * License: GPL Version 2
  * System: Linux
  *    
- * Copyright (c) 2004 All rights reserved.
- *
- * Last change:
+ * Copyright (c) 2014 All rights reserved.
  ********************************************************************/
 
 /* queue of TC_STRUCT elements*/
@@ -31,7 +25,12 @@ typedef struct {
     int allFull;		/* flag meaning it's actually full */
 } TC_QUEUE_STRUCT;
 
-/* TC_QUEUE_STRUCT functions */
+/** 
+ * @section tcq_functions TC_QUEUE_STRUCT functions
+ * API for the motion queue for the motion module.
+ * They have been fully working for a long time and a wise programmer
+ * won't mess with them.
+ */
 
 /* create queue of _size */
 extern int tcqCreate(TC_QUEUE_STRUCT * const tcq, int _size,

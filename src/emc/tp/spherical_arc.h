@@ -1,5 +1,5 @@
 /********************************************************************
- * Description: spherical_arc.h
+ * Description: spherical_arc.c
  *
  * A simple spherical linear interpolation library and related functions.
  *
@@ -8,8 +8,8 @@
  * System: Linux
  *    
  * Copyright (c) 2014 All rights reserved.
- *
  ********************************************************************/
+
 #ifndef SPHERICAL_ARC_H
 #define SPHERICAL_ARC_H
 

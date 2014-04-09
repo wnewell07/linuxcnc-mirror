@@ -1,14 +1,15 @@
 /********************************************************************
 * Description: tp_types.h
-*   Trajectory planner types and constants
+*   Trajectory planner types and constants. This file was separated from tp.h
+*   to resolve circular dependencies in tp headers.
 *
 *   Derived from a work by Fred Proctor & Will Shackleford
 *
-* Author:
+* Author: Robert W. Ellenberg
 * License: GPL Version 2
 * System: Linux
 *    
-* Copyright (c) 2004 All rights reserved.
+* Copyright (c) 2014 All rights reserved.
 *
 ********************************************************************/
 #ifndef TP_TYPES_H

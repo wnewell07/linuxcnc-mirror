@@ -1,17 +1,16 @@
 /********************************************************************
-* Description: tc.h
-*   Discriminate-based trajectory planning
-*
-*   Derived from a work by Fred Proctor & Will Shackleford
-*
-* Author:
-* License: GPL Version 2
-* System: Linux
-*    
-* Copyright (c) 2004 All rights reserved.
-*
-* Last change:
-********************************************************************/
+ * Description: tc.h
+ *   Discriminate-based trajectory planning
+ *
+ *   Derived from a work by Fred Proctor & Will Shackleford
+ *
+ * Author:
+ * License: GPL Version 2
+ * System: Linux
+ *    
+ * Copyright (c) 2004 All rights reserved.
+ ********************************************************************/
+
 #ifndef TC_H
 #define TC_H
 

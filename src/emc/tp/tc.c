@@ -1,18 +1,15 @@
-/*!
-********************************************************************
-* Description: tc.c
-*\brief Discriminate-based trajectory planning
-*
-*\author Derived from a work by Fred Proctor & Will Shackleford
-*\author rewritten by Chris Radek
-*
-* License: GPL Version 2
-* System: Linux
-*
-* Copyright (c) 2004 All rights reserved.
-*
-* Last change:
-********************************************************************/
+/********************************************************************
+ * Description: tc.h
+ *   Discriminate-based trajectory planning
+ *
+ *   Derived from a work by Fred Proctor & Will Shackleford
+ *
+ * Author:
+ * License: GPL Version 2
+ * System: Linux
+ *    
+ * Copyright (c) 2004 All rights reserved.
+ ********************************************************************/
 
 #include "rtapi.h"		/* rtapi_print_msg */
 #include "rtapi_math.h"
