@@ -1475,6 +1475,7 @@ void ARC_FEED(int line_number,
 	break;
     }
 
+        printf("axis_len = %f\n",axis_len);
     if(rotation < 0) {
         if(theta2 >= theta1) theta2 -= M_PI * 2.0;
     } else {
