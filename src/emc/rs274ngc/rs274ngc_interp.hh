@@ -675,8 +675,7 @@ int read_inputs(setup_pointer settings);
  static const read_function_pointer default_readers[256];
 
  setup _setup;
- std::vector<std::string> warning_list;
-
+ PyObject* warning_list;
 
  char warning_text_buf[LINELEN];
  enum {

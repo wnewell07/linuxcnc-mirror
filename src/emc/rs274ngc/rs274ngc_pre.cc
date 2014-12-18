@@ -150,6 +150,9 @@ Interp::Interp()
 	PyErr_Clear();
 	Error("PYTHON: exception during 'this' export:\n%s\n",exception_msg.c_str());
     }
+
+    this->warning_list = PyList_New(0);
+
 }
 
 
@@ -2039,7 +2042,7 @@ void Interp::setWarning(const char *fmt, ...)
     sprintf(line_number_buf, "Warning at line %d: ",this->_setup.sequence_number);
     msg.insert(0,line_number_buf);
 
-    this->warning_list.push_back(msg);
+    PyList_Append(this->warning_list,PyString_FromString(msg.c_str()));
 
     va_end(ap);
 }
@@ -2059,7 +2062,7 @@ int Interp::setSavedError(const char *msg)
 
 int Interp::clearWarning()
 {
-    this->warning_list.clear();
+    //this->warning_list.clear();
     return INTERP_OK;
 }
 
