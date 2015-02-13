@@ -900,7 +900,8 @@ check_stuff ( "before command_handler()" );
                                 emcmotCommand->vel, emcmotCommand->ini_maxvel, 
                                 emcmotCommand->acc, emcmotStatus->enables_new, issue_atspeed,
                                 emcmotCommand->turn);
-        if (res_addline != 0) {
+        //KLUDGE ignore zero length line
+        if (res_addline == -1) {
             reportError(_("can't add linear move at line %d, error code %d"),
                     emcmotCommand->id, res_addline);
             emcmotStatus->commandStatus = EMCMOT_COMMAND_BAD_EXEC;
