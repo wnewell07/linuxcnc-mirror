@@ -480,6 +480,7 @@ double pmLine9Target(PmLine9 * const line9)
  * the struct is properly initialized BEFORE calling this function.
  */
 int tcInit(TC_STRUCT * const tc,
+        int id,
         int motion_type,
         int canon_motion_type,
         double cycle_time,

@@ -80,6 +80,7 @@ int pmRigidTapInit(PmRigidTap * const tap,
 int pmRigidTapTarget(PmRigidTap * const tap, double uu_per_rev);
 
 int tcInit(TC_STRUCT * const tc,
+        int id,
         int motion_type,
         int canon_motion_type,
         double cycle_time,

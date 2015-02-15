@@ -61,7 +61,7 @@ STATIC int tpUpdateCycle(TP_STRUCT * const tp,
 
 STATIC int tpRunOptimization(TP_STRUCT * const tp);
 
-STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc, int inc_id);
+STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc);
 
 STATIC inline double tpGetMaxTargetVel(TP_STRUCT const * const tp, TC_STRUCT const * const tc);
 
@@ -658,6 +658,7 @@ STATIC int tpInitBlendArcFromPrev(TP_STRUCT const * const tp, TC_STRUCT const * 
 #endif
 
     tcInit(blend_tc,
+            prev_line_tc->id,
             TC_SPHERICAL,
             canon_motion_type,
             tp->cycleTime,
@@ -1237,15 +1238,11 @@ STATIC int tpCreateLineLineBlend(TP_STRUCT * const tp, TC_STRUCT * const prev_tc
  * Returns an error code if the queue operation fails, otherwise adds a new
  * segment to the queue and updates the end point of the trajectory planner.
  */
-STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc, int inc_id) {
+STATIC inline int tpAddSegmentToQueue(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 
-    tc->id = tp->nextId;
     if (tcqPut(&tp->queue, tc) == -1) {
         rtapi_print_msg(RTAPI_MSG_ERR, "tcqPut failed.\n");
         return TP_ERR_FAIL;
-    }
-    if (inc_id) {
-        tp->nextId++;
     }
 
     // Store end of current move as new final goal of TP
@@ -1286,8 +1283,13 @@ STATIC int tpSetupSyncedIO(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 /**
  * Adds a rigid tap cycle to the motion queue.
  */
-int tpAddRigidTap(TP_STRUCT * const tp, EmcPose end, double vel, double ini_maxvel,
-        double acc, unsigned char enables) {
+int tpAddRigidTap(TP_STRUCT * const tp,
+        int id,
+        EmcPose end,
+        double vel,
+        double ini_maxvel,
+        double acc,
+        unsigned char enables) {
     if (tpErrorCheck(tp)) {
         return TP_ERR_FAIL;
     }
@@ -1306,6 +1308,7 @@ int tpAddRigidTap(TP_STRUCT * const tp, EmcPose end, double vel, double ini_maxv
      * NOTE: always need atspeed since this is a synchronized movement.
      * */
     tcInit(&tc,
+            id,
             TC_RIGIDTAP,
             0,
             tp->cycleTime,
@@ -1335,7 +1338,7 @@ int tpAddRigidTap(TP_STRUCT * const tp, EmcPose end, double vel, double ini_maxv
     prev_tc = tcqLast(&tp->queue);
     tcFinalizeLength(prev_tc);
     tcFlagEarlyStop(prev_tc, &tc);
-    int retval = tpAddSegmentToQueue(tp, &tc, true);
+    int retval = tpAddSegmentToQueue(tp, &tc);
     tpRunOptimization(tp);
     return retval;
 }
@@ -1483,9 +1486,9 @@ STATIC int tpRunOptimization(TP_STRUCT * const tp) {
             return TP_ERR_OK;
         }
 
-        tp_info_print("  current term = %u, type = %u, id = %u, accel_mode = %d\n",
+        tp_info_print("  current term = %u, type = %u, id = %d, accel_mode = %d\n",
                 tc->term_cond, tc->motion_type, tc->id, tc->accel_mode);
-        tp_info_print("  prev term = %u, type = %u, id = %u, accel_mode = %d\n",
+        tp_info_print("  prev term = %u, type = %u, id = %d, accel_mode = %d\n",
                 prev1_tc->term_cond, prev1_tc->motion_type, prev1_tc->id, prev1_tc->accel_mode);
 
         if (tc->atspeed) {
@@ -1686,7 +1689,7 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 
     if (res_create == TP_ERR_OK) {
         //Need to do this here since the length changed
-        tpAddSegmentToQueue(tp, &blend_tc, false);
+        tpAddSegmentToQueue(tp, &blend_tc);
     } else {
         return res_create;
     }
@@ -1701,8 +1704,16 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
  * end of the previous move to the new end specified here at the
  * currently-active accel and vel settings from the tp struct.
  */
-int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double vel, double
-        ini_maxvel, double acc, unsigned char enables, char atspeed, int indexrotary) {
+int tpAddLine(TP_STRUCT * const tp,
+        int id,
+        EmcPose end,
+        int canon_motion_type,
+        double vel,
+        double ini_maxvel,
+        double acc,
+        unsigned char enables,
+        char atspeed,
+        int indexrotary) {
 
     if (tpErrorCheck(tp) < 0) {
         return TP_ERR_FAIL;
@@ -1712,6 +1723,7 @@ int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double v
     // Initialize new tc struct for the line segment
     TC_STRUCT tc = {0};
     tcInit(&tc,
+            id,
             TC_LINEAR,
             canon_motion_type,
             tp->cycleTime,
@@ -1758,7 +1770,7 @@ int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double v
     tcFinalizeLength(prev_tc);
     tcFlagEarlyStop(prev_tc, &tc);
 
-    int retval = tpAddSegmentToQueue(tp, &tc, true);
+    int retval = tpAddSegmentToQueue(tp, &tc);
     //Run speed optimization (will abort safely if there are no tangent segments)
     tpRunOptimization(tp);
 
@@ -1777,6 +1789,7 @@ int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double v
  * xyz so the target is always the circle/arc/helical length.
  */
 int tpAddCircle(TP_STRUCT * const tp,
+        int id,
         EmcPose end,
         PmCartesian center,
         PmCartesian normal,
@@ -1798,6 +1811,7 @@ int tpAddCircle(TP_STRUCT * const tp,
     TC_STRUCT tc = {0};
 
     tcInit(&tc,
+            id,
             TC_CIRCULAR,
             canon_motion_type,
             tp->cycleTime,
@@ -1852,7 +1866,7 @@ int tpAddCircle(TP_STRUCT * const tp,
     tcFinalizeLength(prev_tc);
     tcFlagEarlyStop(prev_tc, &tc);
 
-    int retval = tpAddSegmentToQueue(tp, &tc, true);
+    int retval = tpAddSegmentToQueue(tp, &tc);
 
     tpRunOptimization(tp);
     return retval;
@@ -2237,7 +2251,7 @@ STATIC void tpUpdateMovementStatus(TP_STRUCT * const tp, TC_STRUCT const * const
     EmcPose target;
     tcGetEndpoint(tc, &target);
 
-    tc_debug_print("tc id = %u canon_type = %u mot type = %u\n",
+    tc_debug_print("tc id = %d canon_type = %d mot type = %d\n",
             tc->id, tc->canon_motion_type, tc->motion_type);
     tp->motionType = tc->canon_motion_type;
     tp->activeDepth = tc->active_depth;
