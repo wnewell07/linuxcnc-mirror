@@ -2736,7 +2736,7 @@ STATIC int tpUpdateCycle(TP_STRUCT * const tp,
 
     // Run cycle update with stored cycle time
     int res_accel = 1;
-    double acc, vel_desired;
+    double acc=0, vel_desired=0;
     
     // If the slowdown is not too great, use velocity ramping instead of trapezoidal velocity
     // Also, don't ramp up for parabolic blends
