@@ -669,8 +669,12 @@ int tcClampVelocityByLength(TC_STRUCT * const tc)
 
     //Reduce max velocity to match sample rate
     //Assume that cycle time is valid here
-    double sample_maxvel = tc->target / tc->cycle_time;
-    tp_debug_print("sample_maxvel = %f\n",sample_maxvel);
+    double length = tc->target;
+    if (tc->motion_type == TC_SPHERICAL) {
+        length += tc->coords.arc.xyz.line_length;
+    }
+    double sample_maxvel = length / tc->cycle_time;
+    tp_debug_print("sample_maxvel = %f\n", sample_maxvel);
     tc->maxvel = fmin(tc->maxvel, sample_maxvel);
     return TP_ERR_OK;
 }
