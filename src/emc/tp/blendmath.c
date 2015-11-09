@@ -533,26 +533,37 @@ int findAccelScale(PmCartesian const * const acc,
 }
 
 
-
-
 /** Find real roots of a quadratic equation in standard form. */
-int quadraticFormula(double A, double B, double C, double * const root0,
+int quadraticFormula(double const A, double const B, double const C, double * const root0,
         double * const root1)
 {
     double disc = pmSq(B) - 4.0 * A * C;
+
     if (disc < 0) {
         tp_debug_print("discriminant %.12g < 0, A=%.12g, B=%.12g,C=%.12g\n", disc, A, B, C);
         return TP_ERR_FAIL;
     }
+
     double t1 = pmSqrt(disc);
+    double r0, r1;
+    if (B >= 0.0) {
+        // First root using Citardauq formula, 2nd using "normal" formula
+        r0 = -(2.0 * C) / (B + t1);
+        r1 = -(B + t1) / (2.0 * A);
+    } else {
+        r0 = (-B + t1) / (2.0 * A);
+        r1 = (2.0 * C) / (-B + t1);
+    }
+
     if (root0) {
-        *root0 = ( -B + t1) / (2.0 * A);
+        *root0 = r0;
     }
     if (root1) {
-        *root1 = ( -B - t1) / (2.0 * A);
+        *root1 = r1;
     }
     return TP_ERR_OK;
 }
+
 
 /**
  * @section blending blend math functions
