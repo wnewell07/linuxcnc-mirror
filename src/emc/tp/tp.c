@@ -1806,6 +1806,11 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
         return TP_ERR_FAIL;
     }
 
+    if (prev_tc->synchronized || tc->synchronized) {
+        tp_debug_print("Can't arc blend synchronized motions (yet)\n");
+        return TP_ERR_FAIL;
+    }
+
     // Check for tangency between segments and handle any errors
     // TODO possibly refactor this into a macro?
     int res_tan = tpSetupTangent(tp, prev_tc, tc);
@@ -2727,6 +2732,8 @@ STATIC void tpSyncPositionMode(TP_STRUCT * const tp, TC_STRUCT * const tc,
     double pos_desired = (tp->spindle.revs - tp->spindle.offset) * tc->uu_per_rev;
     double pos_error = pos_desired - tc->progress;
 
+    // Only applies during parabolic blending, so that progress
+    // accounts for the next segment's movement
     if(nexttc) {
         pos_error -= nexttc->progress;
     }
