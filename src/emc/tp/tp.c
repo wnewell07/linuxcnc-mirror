@@ -234,8 +234,22 @@ STATIC inline double tpGetMaxTargetVel(TP_STRUCT const * const tp, TC_STRUCT con
         //KLUDGE: Don't allow feed override to keep blending from overruning max velocity
         max_scale = fmin(max_scale, 1.0);
     }
-    // Get maximum reachable velocity from max feed override
-    double v_max_target = tc->target_vel * max_scale;
+
+    double v_max_target;
+
+    switch (tc->synchronized) {
+        case TC_SYNC_NONE:
+        case TC_SYNC_POSITION:
+            // Get maximum reachable velocity from max feed override
+            v_max_target = tc->target_vel * max_scale;
+            break;
+
+        case TC_SYNC_VELOCITY:
+            // Don't know what spindle speed corresponds to this move, so assume the worst
+        default:
+            v_max_target=tc->maxvel;
+            break;
+    }
 
     /* Check if the cartesian velocity limit applies and clip the maximum
      * velocity. The vLimit is from the max velocity slider, and should
@@ -246,7 +260,7 @@ STATIC inline double tpGetMaxTargetVel(TP_STRUCT const * const tp, TC_STRUCT con
      */
     if (!tcPureRotaryCheck(tc) && (tc->synchronized != TC_SYNC_POSITION)){
         /*tc_debug_print("Cartesian velocity limit active\n");*/
-        v_max_target = fmin(v_max_target,tp->vLimit);
+        v_max_target = fmin(v_max_target, tp->vLimit);
     }
 
     // Clip maximum velocity by the segment's own maximum velocity
@@ -1725,8 +1739,8 @@ STATIC int tpSetupTangent(TP_STRUCT const * const tp,
 
     // Calculate instantaneous acceleration required for change in direction
     // from v1 to v2, assuming constant speed
-    double v_max1 = fmin(prev_tc->maxvel, prev_tc->reqvel * emcmotConfig->maxFeedScale);
-    double v_max2 = fmin(tc->maxvel, tc->reqvel * emcmotConfig->maxFeedScale);
+    double v_max1 = fmin(prev_tc->maxvel, tpGetMaxTargetVel(tp, tc) * emcmotConfig->maxFeedScale);
+    double v_max2 = fmin(tc->maxvel,  tpGetMaxTargetVel(tp, tc) * emcmotConfig->maxFeedScale);
     double v_max = fmin(v_max1, v_max2);
     tp_debug_print("tangent v_max = %f\n",v_max);
 
