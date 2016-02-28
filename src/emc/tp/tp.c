@@ -528,6 +528,17 @@ int tpGetExecId(TP_STRUCT * const tp)
     return tp->execId;
 }
 
+struct state_tag_t tpGetExecTag(TP_STRUCT * const tp)
+{
+    if (0 == tp) {
+        struct state_tag_t empty = {0};
+        return empty;
+    }
+
+    return tp->execTag;
+}
+
+
 /**
  * Sets the termination condition for all subsequent queued moves.
  * If cond is TC_TERM_COND_STOP, motion comes to a stop before a subsequent move
@@ -687,22 +698,27 @@ STATIC double tpCalculateOptimizationInitialVel(TP_STRUCT const * const tp, TC_S
  * initialize a blend arc. This function does not handle connecting the
  * segments together, however.
  */
-STATIC int tpInitBlendArcFromPrev(TP_STRUCT const * const tp, TC_STRUCT const * const prev_line_tc,
-        TC_STRUCT* const blend_tc, double vel, double ini_maxvel, double acc) {
-
+STATIC int tpInitBlendArcFromPrev(TP_STRUCT const * const tp,
+        TC_STRUCT const * const prev_tc,
+        TC_STRUCT* const blend_tc,
+        double vel,
+        double ini_maxvel,
+        double acc) {
 
 #ifdef TP_SHOW_BLENDS
     int canon_motion_type = EMC_MOTION_TYPE_ARC;
 #else
-    int canon_motion_type = prev_line_tc->canon_motion_type;
+    int canon_motion_type = prev_tc->canon_motion_type;
 #endif
 
     tcInit(blend_tc,
             TC_SPHERICAL,
             canon_motion_type,
             tp->cycleTime,
-            prev_line_tc->enables,
-            prev_line_tc->atspeed);
+            prev_tc->enables,
+            prev_tc->atspeed);
+    //FIXME refactor into Init
+    blend_tc->tag = prev_tc->tag;
 
     // Copy over state data from TP
     tcSetupState(blend_tc, tp);
@@ -714,7 +730,7 @@ STATIC int tpInitBlendArcFromPrev(TP_STRUCT const * const tp, TC_STRUCT const * 
             acc);
 
     // Skip syncdio setup since this blend extends the previous line
-    blend_tc->syncdio = prev_line_tc->syncdio; //enqueue the list of DIOs that need toggling
+    blend_tc->syncdio = prev_tc->syncdio; //enqueue the list of DIOs that need toggling
 
     // find "helix" length for target
     double length;
@@ -1398,8 +1414,13 @@ STATIC int tpSetupSyncedIO(TP_STRUCT * const tp, TC_STRUCT * const tc) {
 /**
  * Adds a rigid tap cycle to the motion queue.
  */
-int tpAddRigidTap(TP_STRUCT * const tp, EmcPose end, double vel, double ini_maxvel,
-        double acc, unsigned char enables) {
+int tpAddRigidTap(TP_STRUCT * const tp,
+        EmcPose end,
+        double vel,
+        double ini_maxvel,
+        double acc,
+        unsigned char enables,
+        struct state_tag_t tag) {
     if (tpErrorCheck(tp)) {
         return TP_ERR_FAIL;
     }
@@ -1862,7 +1883,7 @@ STATIC int tpHandleBlendArc(TP_STRUCT * const tp, TC_STRUCT * const tc) {
  * currently-active accel and vel settings from the tp struct.
  */
 int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double vel, double
-        ini_maxvel, double acc, unsigned char enables, char atspeed, int indexrotary) {
+        ini_maxvel, double acc, unsigned char enables, char atspeed, int indexrotary, struct state_tag_t tag) {
 
     if (tpErrorCheck(tp) < 0) {
         return TP_ERR_FAIL;
@@ -1877,6 +1898,7 @@ int tpAddLine(TP_STRUCT * const tp, EmcPose end, int canon_motion_type, double v
             tp->cycleTime,
             enables,
             atspeed);
+    tc.tag = tag;
 
     // Setup any synced IO for this move
     tpSetupSyncedIO(tp, &tc);
@@ -1943,7 +1965,8 @@ int tpAddCircle(TP_STRUCT * const tp,
         double ini_maxvel,
         double acc,
         unsigned char enables,
-        char atspeed)
+        char atspeed,
+        struct state_tag_t tag)
 {
     if (tpErrorCheck(tp)<0) {
         return TP_ERR_FAIL;
@@ -1960,6 +1983,7 @@ int tpAddCircle(TP_STRUCT * const tp,
             tp->cycleTime,
             enables,
             atspeed);
+    tc.tag = tag;
     // Setup any synced IO for this move
     tpSetupSyncedIO(tp, &tc);
 
@@ -2682,6 +2706,9 @@ STATIC int tpActivateSegment(TP_STRUCT * const tp, TC_STRUCT * const tc) {
         rtapi_print_msg(RTAPI_MSG_DBG, "Waiting on sync...\n");
         return TP_ERR_WAITING;
     }
+
+    // Update the modal state displayed by the TP
+    tp->execTag = tc->tag;
 
     return TP_ERR_OK;
 }
