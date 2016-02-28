@@ -42,7 +42,7 @@ double tcGetMaxTargetVel(TC_STRUCT const * const tc,
         case TC_SYNC_VELOCITY: //Fallthrough
         case TC_SYNC_POSITION:
             //KLUDGE assume 2000RPM since we have no spindle speed input here
-            v_max_target = tc->uu_per_rev * 33.0 * max_scale;
+            v_max_target = tc->uu_per_rev * tc->tag.speed * max_scale;
             break;
 
         default:
